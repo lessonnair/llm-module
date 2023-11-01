@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from ..custom_log import Logger
+import json
+from transformers import AutoTokenizer
 import sys
 
 
@@ -9,13 +11,24 @@ class Task(object):
     def __init__(self, config):
         self.config = config
         self.name = self.__class__.__name__
-
         self.logger = Logger(self.name)
+
+        self.proxies = self.load_proxies()
+
+
+    def load_proxies(self):
+        res = {}
+        proxies = self.config.get("Project", "proxies")
+        if proxies != None and len(proxies)>0:
+            res = json.loads(proxies)
+        return res
 
 
     def get_config(self, field_name):
         return self.config.get(self.name, field_name)
 
+    def get_section_params(self):
+        return self.config.get_section_kvs(self.name)
 
     def run(self):
         self.logger.info("Task {} start ...".format(self.name))
@@ -24,18 +37,28 @@ class Task(object):
         self.clear()
         self.logger.info("Task {} end.".format(self.name))
 
-
     def clear(self):
         pass
 
 
-class AutoTokenizerLoader(Task):
+class TokenizerLoader(Task):
 
     def __init__(self, config):
-        super(AutoTokenizerLoader, self).__init__(config)
+        super(TokenizerLoader, self).__init__(config)
 
+        self.model_path = self.get_config("pretrained_model_name_or_path")
+        params = self.get_section_params()
+        params.pop("pretrained_model_name_or_path")
+        self.params = params
 
+        if len(self.proxies) > 0:
+            self.params["proxies"] = self.proxies
 
+    def main_handle(self):
+        self.inst = AutoTokenizer.from_pretrained(
+            self.model_path,
+            **self.params
+        )
 
 
 class Project(Task):

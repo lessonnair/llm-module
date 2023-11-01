@@ -65,7 +65,7 @@ class TaskConfig(object):
 
     def get_section_kvs(self, section_name):
         kvs = self.config.items(section_name)
-        kvs = {k: parse_value(v) for k, v in kvs}
+        kvs = {k: self.parse_value(v) for k, v in kvs}
         return kvs
 
 
