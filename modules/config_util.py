@@ -70,7 +70,7 @@ class TaskConfig(object):
 
 
 if __name__=='__main__':
-    config = TaskConfig("../config/trainer.ini")
+    config = TaskConfig("../example/trainer.ini")
 
     print(config.get_section_field_value("AutoTokenizerLoader", "pretrained_model_name_or_path"))
     print(config.get_section_kvs("AutoTokenizerLoader"))

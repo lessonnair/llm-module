@@ -2,7 +2,7 @@
 
 from ..custom_log import Logger
 import json
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import sys
 
 
@@ -18,7 +18,7 @@ class Task(object):
 
     def load_proxies(self):
         res = {}
-        proxies = self.config.get("Project", "proxies")
+        proxies = self.config.get("Project", "proxies", fallback={})
         if proxies != None and len(proxies)>0:
             res = json.loads(proxies)
         return res
@@ -56,6 +56,27 @@ class TokenizerLoader(Task):
 
     def main_handle(self):
         self.inst = AutoTokenizer.from_pretrained(
+            self.model_path,
+            **self.params
+        )
+
+
+class ModelLoader(Task):
+
+    def __init__(self, config):
+        super(ModelLoader, self).__init__(config)
+
+        self.model_path = self.get_config("pretrained_model_name_or_path")
+        params = self.get_section_params()
+        params.pop("pretrained_model_name_or_path")
+        self.params = params
+
+        if len(self.proxies) > 0:
+            self.params["proxies"] = self.proxies
+
+
+    def main_handle(self):
+        self.inst = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             **self.params
         )
