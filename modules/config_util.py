@@ -6,6 +6,10 @@ import pandas as pd
 import re
 from util import *
 
+
+SCIENTIFIC_NOTATION_PATTERN = re.compile("^([\\+|-]?\\d+(.{0}|.\\d+))[Ee]{1}([\\+|-]?\\d+)$")
+
+
 def read_config_file(config_path):
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     config.read(config_path)
@@ -56,10 +60,8 @@ class TaskConfig(object):
             res = True
         elif v in ('False', 'false'):
             res = False
-        elif isFloat(v):
-            res = float(v)
-        elif v.isdecimal():
-            res = int(v)
+        elif isFloat(v) or v.isdecimal() or SCIENTIFIC_NOTATION_PATTERN.match(v):
+            res = eval(v)
         return res
 
 
