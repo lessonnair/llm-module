@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import configparser
-import json
-import pandas as pd
 import re
-from util import *
-
+from .util import *
 
 SCIENTIFIC_NOTATION_PATTERN = re.compile("^([\\+|-]?\\d+(.{0}|.\\d+))[Ee]{1}([\\+|-]?\\d+)$")
 
@@ -14,6 +11,7 @@ def read_config_file(config_path):
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     config.read(config_path)
     return config
+
 
 class TaskConfig(object):
 
@@ -64,15 +62,14 @@ class TaskConfig(object):
             res = eval(v)
         return res
 
-
     def get_section_kvs(self, section_name):
         kvs = self.config.items(section_name)
         kvs = {k: self.parse_value(v) for k, v in kvs}
         return kvs
 
 
-if __name__=='__main__':
-    config = TaskConfig("../example/trainer.ini")
+if __name__ == '__main__':
+    config = TaskConfig("../../example/trainer.ini")
 
     print(config.get_section_field_value("AutoTokenizerLoader", "pretrained_model_name_or_path"))
     print(config.get_section_kvs("AutoTokenizerLoader"))

@@ -16,6 +16,3 @@ class InstancePool(object):
 
     def get(self, key):
         return self.pool.get(key)
-
-
-
