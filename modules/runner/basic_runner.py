@@ -30,15 +30,18 @@ class Task(object):
             res = json.loads(proxies)
         return res
 
-    def get_config(self, field_name):
-        return self.config.get(self.name, field_name)
+    def get_config(self, field_name, default=None):
+        return self.config.parse_value(self.config.get(self.name, field_name, fallback=default), empty_to_none=True)
 
-    def get_config_list(self, field_name):
+    def get_config_list(self, field_name, default=None):
         vs = self.config.get(self.name, field_name)
-        return [s.strip() for s in vs.split(",")]
+        if vs is not None and len(vs) > 0:
+            return [s.strip() for s in vs.split(",")]
+        else:
+            return default
 
     def get_section_params(self):
-        return self.config.get_section_kvs(self.name)
+        return self.config.get_section_kvs(self.name, empty_to_none=True)
 
     def get_instance(self, key):
         inst = self.instance_pool.get(key)

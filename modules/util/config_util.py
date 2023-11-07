@@ -23,7 +23,7 @@ class TaskConfig(object):
 
     def _parse_field_list_str(self, s):
         ret = None
-        if s != None and len(s) > 0:
+        if s is not None and len(s) > 0:
             s = s.strip()
             ret = [p.strip() for p in s.split(",")]
         return ret
@@ -42,14 +42,14 @@ class TaskConfig(object):
         else:
             ret = dataPathList
 
-        if ret == None:
+        if ret is None:
             ret = default
         return ret
 
     def get_section_field_value(self, section_name, field_name):
         return self.config.get(section_name, field_name)
 
-    def parse_value(self, v):
+    def parse_value(self, v, empty_to_none=False):
         v = str(v)
         res = v
         if v == 'None':
@@ -60,11 +60,13 @@ class TaskConfig(object):
             res = False
         elif isFloat(v) or v.isdecimal() or SCIENTIFIC_NOTATION_PATTERN.match(v):
             res = eval(v)
+        elif v == '' and empty_to_none:
+            res = None
         return res
 
-    def get_section_kvs(self, section_name):
+    def get_section_kvs(self, section_name, empty_to_none=False):
         kvs = self.config.items(section_name)
-        kvs = {k: self.parse_value(v) for k, v in kvs}
+        kvs = {k: self.parse_value(v, empty_to_none=empty_to_none) for k, v in kvs}
         return kvs
 
 
