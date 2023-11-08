@@ -57,9 +57,11 @@ class Trainer(Task):
 
     def main_handle(self):
 
+        self.model.train()
         if len(self.stage) == 1:
             stage = self.stage[0]
             if stage == 'eval':
+                self.model.eval()
                 self.dataset = {"eval_dataset": self.dataset.values[0]}
 
         trainer = transformers.Trainer(

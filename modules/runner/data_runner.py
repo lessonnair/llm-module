@@ -9,7 +9,8 @@ class DatasetLoader(Task):
     def __init__(self, config, name=None):
         super(DatasetLoader, self).__init__(config, name=name)
 
-        self.data_type = self.get_config("type")
+        self.path = self.get_config("path")
+        self.data_files = self.get_config_list("data_files")
         self.split_train_val = self.get_config("split_train_val")
         self.split_train_val_val_size = self.get_config("split_train_val_val_size")
         self.split_train_val_seed = self.get_config("split_train_val_seed")
@@ -18,32 +19,15 @@ class DatasetLoader(Task):
 
         params = self.get_section_params()
 
-        value = self.get_config("value")
-
-        for c in ("type", "value", "split_train_val", "split_train_val_val_size", "split_train_val_seed",
-                  "split_train_val_buffer_size"):
+        for c in (
+                "path", "split_train_val", "split_train_val_val_size", "split_train_val_seed",
+                "split_train_val_buffer_size"):
             params.pop(c)
-
-        data_path = None
-        data_files = None
-
-        if self.data_type == "hf_hub":
-            data_path = value
-            data_files = None
-        elif self.data_type == "script":
-            data_path = value
-            data_files = None
-        elif self.data_type == "file":
-            data_path = None
-            data_files = self.get_config_list("value")
-
-        params["path"] = self.get_config("path")
-        params["data_files"] = data_files
 
         self.params = params
 
     def main_handle(self):
-        dataset = load_dataset(**self.params)
+        dataset = load_dataset(self.path, **self.params)
 
         res = {}
 
