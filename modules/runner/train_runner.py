@@ -25,7 +25,7 @@ class DataCollator(Task):
         super(DataCollator, self).__init__(config)
 
         self.module = self.get_config("class")
-        self.tokenizer = self.get_instance("TokenizerLoader")
+        self.tokenizer = self.get_instance(self.get_config("tokenizer"))
 
         params = self.get_section_params()
         params.pop("class")

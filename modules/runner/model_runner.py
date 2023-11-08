@@ -44,12 +44,19 @@ class ModelLoader(Task):
             **self.params
         )
 
+        self.logger.info("model", self.inst)
+
 
 class LoraConfig(Task):
 
     def __init__(self, config):
         super(LoraConfig, self).__init__(config)
-        self.params = self.get_section_params()
+
+        target_modules = self.get_config_list("target_modules")
+        params = self.get_section_params()
+        params["target_modules"] = target_modules
+
+        self.params = params
 
     def main_handle(self):
         self.inst = peft.LoraConfig(**self.params)
@@ -57,12 +64,12 @@ class LoraConfig(Task):
 
 class AdapterLoader(Task):
 
-    def __int__(self, config):
+    def __init__(self, config):
         super(AdapterLoader, self).__init__(config)
 
-        self.model = self.get_instance("model")
+        self.model = self.get_instance(self.get_config("model"))
         self.config_checkpoint_dir = self.get_config_list("config_checkpoint_dir")
-        self.lora_config = self.get_instance("lora_config")
+        self.lora_config = self.get_instance(self.get_config("lora_config"))
 
     def main_handle(self):
         if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
