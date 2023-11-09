@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from modules.util.custom_log import Logger
+from modules.util.package_util import import_package
 from modules.util.pool import InstancePool
 import json
 import re
@@ -41,9 +42,13 @@ class Task(object):
             return default
 
     def get_section_params(self):
-        return self.config.get_section_kvs(self.name, empty_to_none=True)
+        params = self.config.get_section_kvs(self.name, empty_to_none=True)
+        if "class" in params:
+            params.pop("class")
+        return params
 
     def get_instance(self, key):
+        key = self.get_config(key)
         inst = self.instance_pool.get(key)
         if inst is not None:
             return inst
@@ -70,4 +75,7 @@ class Task(object):
     def clear(self):
         pass
 
-
+    def get_inst_clazz(self):
+        clazz = self.get_config("class", default=None)
+        if clazz is not None:
+            return import_package(clazz)

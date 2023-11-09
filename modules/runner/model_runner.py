@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .basic_runner import Task
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 import peft
 
 
@@ -31,20 +31,24 @@ class ModelLoader(Task):
         super(ModelLoader, self).__init__(config)
 
         self.model_path = self.get_config("pretrained_model_name_or_path")
+        self.print_model_structure = self.get_config("print_model_structure")
+
         params = self.get_section_params()
-        params.pop("pretrained_model_name_or_path")
+        for c in ("pretrained_model_name_or_path", "print_model_structure"):
+            params.pop(c)
         self.params = params
 
         if len(self.proxies) > 0:
             self.params["proxies"] = self.proxies
 
     def main_handle(self):
-        self.inst = AutoModelForCausalLM.from_pretrained(
+        self.inst = getattr(self.get_inst_clazz(), "from_pretrained")(
             self.model_path,
             **self.params
         )
 
-        self.logger.info("model", self.inst)
+        if self.print_model_structure:
+            self.logger.info("model", self.inst)
 
 
 class LoraConfig(Task):
@@ -67,9 +71,9 @@ class AdapterLoader(Task):
     def __init__(self, config):
         super(AdapterLoader, self).__init__(config)
 
-        self.model = self.get_instance(self.get_config("model"))
+        self.model = self.get_instance("model")
         self.config_checkpoint_dir = self.get_config_list("config_checkpoint_dir")
-        self.lora_config = self.get_instance(self.get_config("lora_config"))
+        self.lora_config = self.get_instance("lora_config")
 
     def main_handle(self):
         if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
