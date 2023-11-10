@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import tiktoken
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
+
 @dataclass
 class Template:
-
     prefix: List[Union[str, Dict[str, str]]]
     prompt: List[Union[str, Dict[str, str]]]
     system: str
@@ -21,8 +22,24 @@ class Template:
                        history: Optional[List[Tuple[str, str]]] = None,
                        system: Optional[str] = None
                        ) -> Tuple[List[int], List[int]]:
-        pass
+        system, history = self._format(query, resp, history, system)
+        encoded_pairs = self._encode(tokenizer, system, history)
+        prompt_ids = []
+        for query_ids, resp_ids in encoded_pairs[:-1]:
+            prompt_ids = prompt_ids + query_ids + resp_ids
+        prompt_ids, answer_ids = prompt_ids + encoded_pairs[-1][0], encoded_pairs[-1][1]
+        return prompt_ids, answer_ids
 
+    def encode_multiturn(self,
+                         tokenizer: "PreTrainedTokenizer",
+                         query: str,
+                         resp: str,
+                         history: Optional[List[Tuple[str, str]]] = None,
+                         system: Optional[str] = None
+                         ) -> List[Tuple[List[int], List[int]]]:
+        system, history = self._format(query, resp, history, system)
+        encoded_pairs = self._encode(tokenizer, system, history)
+        return encoded_pairs
 
     def _encode(self,
                 tokenizer: "PreTrainedTokenizer",
@@ -47,11 +64,10 @@ class Template:
             else:
                 prefix_ids = sep_ids + bos_ids
 
-            query_ids = self._convert_inputs_to_ids(tokenizer,  context=self.prompt, query=query, idx=str(turn_idx))
+            query_ids = self._convert_inputs_to_ids(tokenizer, context=self.prompt, query=query, idx=str(turn_idx))
             resp_ids = self._convert_inputs_to_ids(tokenizer, context=[resp])
             encoded_pairs.append((prefix_ids + query_ids, resp_ids + eos_ids))
         return encoded_pairs
-
 
     def _format(self,
                 query: str,
@@ -63,7 +79,6 @@ class Template:
         history = history if (history and self.use_history) else []
         history = history + [(query, resp)]
         return system, history
-
 
     def _get_special_ids(self,
                          tokenizer: "PreTrainedTokenizer"
@@ -77,13 +92,12 @@ class Template:
         if tokenizer.eos_token_id is None:
             raise ValueError("EOS token is required.")
 
-        if self.efficient_eos: # used in baichuan, qwen, chatglm, etc.
+        if self.efficient_eos:  # used in baichuan, qwen, chatglm, etc.
             eos_ids = []
         else:
             eos_ids = [tokenizer.eos_token_id]
 
         return bos_ids, eos_ids
-
 
     def _convert_inputs_to_ids(self,
                                tokenizer: "PreTrainedTokenizer",
@@ -118,10 +132,10 @@ class Template:
 class Llama2Template(Template):
 
     def _encode(
-        self,
-        tokenizer: "PreTrainedTokenizer",
-        system: str,
-        history: List[Tuple[str, str]]
+            self,
+            tokenizer: "PreTrainedTokenizer",
+            system: str,
+            history: List[Tuple[str, str]]
     ) -> List[Tuple[List[int], List[int]]]:
         r"""
         Encodes formatted inputs to pairs of token ids.
@@ -131,13 +145,9 @@ class Llama2Template(Template):
         bos_ids, eos_ids = self._get_special_ids(tokenizer)
         encoded_pairs = []
         for turn_idx, (query, resp) in enumerate(history):
-            if turn_idx == 0: # llama2 template has no sep_ids
+            if turn_idx == 0:  # llama2 template has no sep_ids
                 query = self.prefix[0].replace("{{system}}", system) + query
             query_ids = self._convert_inputs_to_ids(tokenizer, context=self.prompt, query=query)
             resp_ids = self._convert_inputs_to_ids(tokenizer, context=[resp])
             encoded_pairs.append((bos_ids + query_ids, resp_ids + eos_ids))
         return encoded_pairs
-
-
-
-
