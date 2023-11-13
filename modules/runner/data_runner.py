@@ -4,6 +4,7 @@ from .basic_runner import Task
 from typing import Any, Dict, List
 from datasets import load_dataset
 from itertools import chain
+from modules.etl.preprocess import *
 
 
 class DatasetLoader(Task):
@@ -37,37 +38,21 @@ class DatasetProcess(Task):
         dataset = self.get_instance("dataset")
         column_names = list(next(iter(dataset)).keys())
 
-        def preprocess_pretrain_dataset(examples: Dict[str, List[Any]]) -> Dict[str, Any]:
-
-            kwargs = dict(add_special_tokens=True)
-
-            if hasattr(self.tokenizer, "add_eos_token"):  # for LLaMA tokenizer
-                setattr(self.tokenizer, "add_eos_token", True)
-
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
-            tokenized_examples = self.tokenizer(examples["instruction"], **kwargs)
-            concatenated_examples = {k: list(chain(*tokenized_examples[k])) for k in tokenized_examples.keys()}
-            total_length = len(concatenated_examples[list(concatenated_examples.keys())[0]])
-            block_size = self.cutoff_len
-            # we drop the small remainder, and if the total_length < block_size, we exclude this batch
-            total_length = (total_length // block_size) * block_size
-            # split by chunks of cutoff_len
-            result = {
-                k: [t[i: i + block_size] for i in range(0, total_length, block_size)]
-                for k, t in concatenated_examples.items()
-            }
-            return result
-
         if self.stage == "pt":
+            def preprocess_func(examples):
+                return preprocess_pretrain_dataset(self.tokenizer,
+                                                   examples,
+                                                   self.cutoff_len)
+
             dataset = dataset.filter(lambda example: example["instruction"])
+
             kwargs = dict(
                 num_proc=1,
                 load_from_cache_file=False,
                 desc="Running tokenizer on dataset"
             )
             dataset = dataset.map(
-                preprocess_pretrain_dataset,
+                preprocess_func,
                 batched=True,
                 remove_columns=column_names,
                 **kwargs

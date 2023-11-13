@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from .basic_runner import Task
-from transformers import AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer
 import peft
+import torch
+from types import MethodType
+from transformers import PreTrainedTokenizerBase
 
 
 class TokenizerLoader(Task):
@@ -19,10 +22,19 @@ class TokenizerLoader(Task):
             self.params["proxies"] = self.proxies
 
     def main_handle(self):
-        self.inst = AutoTokenizer.from_pretrained(
+        config = AutoConfig.from_pretrained(self.model_path, **self.params)
+        tokenizer = AutoTokenizer.from_pretrained(
             self.model_path,
             **self.params
         )
+        if getattr(config, "model_type", None) == "chatglm":
+            tokenizer._pad = MethodType(PreTrainedTokenizerBase._pad, tokenizer)
+
+        if getattr(config, "model_type", None) == "qwen":
+            for dtype_name, dtype in [("fp16", torch.float16), ("bf16", torch.bfloat16), ("fp32", torch.float32)]:
+                setattr(config, dtype_name, getattr(config, "torch_dtype", None) == dtype)
+
+        self.inst = tokenizer
 
 
 class ModelLoader(Task):
