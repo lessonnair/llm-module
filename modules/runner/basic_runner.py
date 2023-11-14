@@ -62,6 +62,12 @@ class Task(object):
 
             return task_inst.inst
 
+    def pop_dict(self, params, k, default=None):
+        res = default
+        if k in params:
+            res = params.pop(k)
+        return res
+
     def run(self):
         self.logger.info("Task {} start ...".format(self.name))
         self.main_handle()
