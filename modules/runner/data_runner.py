@@ -32,9 +32,7 @@ class DatasetLoader(Task):
 
         self.train_on_prompt = self.pop_dict(params, "train_on_prompt")
 
-        for c in ("tokenizer"):
-            if c in params:
-                params.pop(c)
+        params.pop("tokenizer")
 
         self.params = params
 
@@ -60,20 +58,22 @@ class DatasetLoader(Task):
                                                   self.cutoff_len,
                                                   self.train_on_prompt,
                                                   examples)
+            dataset = dataset.filter(lambda example: example["prompt"] and example["response"])
         elif self.stage == "rm":
-            return preprocess_pairwise_dataset(self.tokenizer,
-                                               examples,
-                                               self.cutoff_len)
+            def preprocess_func(examples):
+                return preprocess_pairwise_dataset(examples)
+            dataset = dataset.filter(lambda example: example["prompt"] and len(example["response"]) > 1)
         else:
-            return preprocess_unsupervised_dataset(self.tokenizer,
-                                                   examples,
-                                                   self.cutoff_len)
+            def preprocess_func(examples):
+                return preprocess_unsupervised_dataset(examples)
+            dataset = dataset.filter(lambda example: example["prompt"])
 
-        kwargs = dict(
-            num_proc=1,
-            load_from_cache_file=False,
-            desc="Running tokenizer on dataset"
-        )
+        if not self.streaming:
+            kwargs = dict(
+                num_proc=1,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset"
+            )
         dataset = dataset.map(
             preprocess_func,
             batched=True,

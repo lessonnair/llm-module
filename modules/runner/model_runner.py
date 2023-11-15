@@ -12,7 +12,6 @@ from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
 from modules.util.checkpoint_util import *
 from modules.util.analyze_util import *
-from modules.extras import llama_patch
 
 try:
     from transformers.integrations import is_deepspeed_zero3_enabled
@@ -45,6 +44,8 @@ class TokenizerLoader(Task):
         if getattr(config, "model_type", None) == "qwen":
             for dtype_name, dtype in [("fp16", torch.float16), ("bf16", torch.bfloat16), ("fp32", torch.float32)]:
                 setattr(config, dtype_name, getattr(config, "torch_dtype", None) == dtype)
+                if "torch_dtype" in self.config_kwargs:
+                    self.config_kwargs["torch_dtype"] = dtype
 
         self.inst = tokenizer
 
@@ -73,6 +74,9 @@ class ModelLoader(Task):
         self.flash_attn = self.pop_dict(params, "flash_attn")
         self.shift_attn = self.pop_dict(params, "shift_attn")
         self.quantization_bit = self.pop_dict(params, "quantization_bit")
+        self.double_quantization = self.pop_dict(params, "double_quantization", None)
+        self.quantization_type = self.pop_dict(params, "quantization_type", None)
+
         self.reward_model = self.pop_dict(params, "reward_model")
 
         self.config_kwargs = config_kwargs
@@ -88,6 +92,13 @@ class ModelLoader(Task):
         if getattr(config, "model_type", None) == "qwen":
             for dtype_name, dtype in [("fp16", torch.float16), ("bf16", torch.bfloat16), ("fp32", torch.float32)]:
                 setattr(config, dtype_name, getattr(config, "torch_dtype", None) == dtype)
+
+        if "torch_dtype" in self.params:
+            torch_dtype = self.params["torch_dtype"]
+            for dtype_name, dtype in [("fp16", torch.float16), ("bf16", torch.bfloat16), ("fp32", torch.float32)]:
+                if torch_dtype == torch_dtype:
+                    self.params["torch_dtype"] = dtype
+                    break
 
         # set rope scaling
         if self.rope_scaling is not None:
@@ -125,6 +136,7 @@ class ModelLoader(Task):
                 self.logger.warning("Current model does not support RoPE scaling.")
 
         if self.flash_attn:
+            from modules.extras import llama_patch
             if getattr(config, "model_type", None) == "llama":
                 LlamaModule.LlamaAttention = llama_patch.LlamaFlashAttention2
                 LlamaModule.LlamaModel._prepare_decoder_attention_mask = llama_patch._prepare_decoder_attention_mask
@@ -134,6 +146,7 @@ class ModelLoader(Task):
             else:
                 self.logger.warning("Current model does not support FlashAttention-2.")
         elif self.is_trainable and self.shift_attn and getattr(config, "model_type", None) == "llama":
+            from modules.extras import llama_patch
             LlamaModule.LlamaAttention = llama_patch.LlamaShiftShortAttention
             self.logger.warning("Using `--flash_attn` for faster training in large context length.")
 
@@ -159,8 +172,8 @@ class ModelLoader(Task):
                 self.config_kwargs["quantization_config"] = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_compute_dtype=self.params.get("torch_dtype"),
-                    bnb_4bit_use_double_quant=self.pop_dict(self.params, "double_quantization", None),
-                    bnb_4bit_quant_type=self.pop_dict(self.params, "quantization_type", None)
+                    bnb_4bit_use_double_quant=self.double_quantization,
+                    bnb_4bit_quant_type=self.quantization_type
                 )
             is_mergeable = False
             self.config_kwargs["device_map"] = {

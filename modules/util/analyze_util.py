@@ -14,8 +14,11 @@ try:
     _is_fp16_available = is_torch_npu_available() or is_torch_cuda_available()
     _is_bf16_available = is_torch_bf16_gpu_available() or is_torch_bf16_cpu_available
 except ImportError:
-    _is_fp16_available = torch.cuda.is_available()
-    _is_bf16_available = torch.cuda.is_bf16_supported()
+    try:
+        _is_fp16_available = torch.cuda.is_available()
+        _is_bf16_available = torch.cuda.is_bf16_supported()
+    except Exception as e:
+        print(e)
 
 if TYPE_CHECKING:
     from transformers.modeling_utils import PreTrainedModel

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import tiktoken
+# import tiktoken
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
