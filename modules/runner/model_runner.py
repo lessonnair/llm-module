@@ -2,15 +2,22 @@
 
 from .basic_runner import Task
 import math
-from transformers import AutoConfig, AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer, PretrainedConfig
 import os
 import peft
 import torch
 from types import MethodType
-from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase
+from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase, PreTrainedModel
 from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
+from modules.util.checkpoint_util import *
+from modules.util.analyze_util import *
 from modules.extras import llama_patch
+
+try:
+    from transformers.integrations import is_deepspeed_zero3_enabled
+except ImportError:  # https://github.com/huggingface/transformers/releases/tag/v4.33.1
+    from transformers.deepspeed import is_deepspeed_zero3_enabled
 
 
 class TokenizerLoader(Task):
@@ -66,14 +73,13 @@ class ModelLoader(Task):
         self.flash_attn = self.pop_dict(params, "flash_attn")
         self.shift_attn = self.pop_dict(params, "shift_attn")
         self.quantization_bit = self.pop_dict(params, "quantization_bit")
+        self.reward_model = self.pop_dict(params, "reward_model")
 
         self.config_kwargs = config_kwargs
         self.params = params
 
         if len(self.proxies) > 0:
             self.config_kwargs["proxies"] = self.proxies
-
-
 
     def main_handle(self):
 
@@ -131,7 +137,6 @@ class ModelLoader(Task):
             LlamaModule.LlamaAttention = llama_patch.LlamaShiftShortAttention
             self.logger.warning("Using `--flash_attn` for faster training in large context length.")
 
-
         if self.is_trainable and self.shift_attn:
             if getattr(config, "model_type", None) == "llama":
                 setattr(config, "group_size_ratio", 0.25)
@@ -141,6 +146,9 @@ class ModelLoader(Task):
 
         is_mergeable = True
         if self.quantization_bit is not None:
+            if is_deepspeed_zero3_enabled():
+                raise ValueError("DeepSpeed ZeRO-3 is incompatible with quantization.")
+
             if self.quantization_bit == 8:
                 require_version("bitsandbytes>=0.37.0", "To fix: pip install bitsandbytes>=0.37.0")
                 self.config_kwargs["load_in_8bit"] = True
@@ -155,33 +163,70 @@ class ModelLoader(Task):
                     bnb_4bit_quant_type=self.pop_dict(self.params, "quantization_type", None)
                 )
             is_mergeable = False
-            self.config_kwargs["device_map"] = {"": int(os.environ.get("LOCAL_RANK", "0"))} if self.is_trainable else "auto"
+            self.config_kwargs["device_map"] = {
+                "": int(os.environ.get("LOCAL_RANK", "0"))} if self.is_trainable else "auto"
             self.logger.info("Quantizing model to {} bit.".format(self.quantization_bit))
 
-        self.inst = getattr(self.get_inst_clazz(), "from_pretrained")(
+        model = getattr(self.get_inst_clazz(), "from_pretrained")(
             self.model_path,
             config=config,
             **self.params,
             **self.config_kwargs
         )
+        # Disable custom generate method (for Qwen and Baichuan2)
+        if isinstance(model, PreTrainedModel) and "GenerationMixin" not in str(model.generate.__func__):
+            model.generate = MethodType(PreTrainedModel.generate, model)
+
+        # Fix LM head (for ChatGLM2)
+        if getattr(config, "model_type", None) == "chatglm":
+            setattr(model, "lm_head", model.transformer.output_layer)
+
+        # Register auto class to save the custom code files.
+        if isinstance(config, PretrainedConfig) and "AutoConfig" in getattr(config, "auto_map", {}):
+            config.__class__.register_for_auto_class()
+        if isinstance(model, PreTrainedModel) and "AutoModelForCausalLM" in getattr(config, "auto_map", {}):
+            model.__class__.register_for_auto_class()
+
+        if self.stage in ("rm", "ppo"):
+            from trl import AutoModelForCausalLMWithValueHead
+            require_version("trl>=0.7.1", "To fix: pip install trl>=0.7.1")
+            model = AutoModelForCausalLMWithValueHead.from_pretrained(model)
+            model._keys_to_ignore_on_save = None
+
+            # load valuehead weights to evaluate reward model
+            if self.stage == "rm" and self.checkpoint_dir is not None:
+                self.logger.warning("Only the last checkpoint containing valuehead will be loaded.")
+                if load_valuehead_params(model, self.checkpoint_dir):
+                    model.v_head.load_state_dict({
+                        "summary.weight": getattr(model, "reward_head_weight"),
+                        "summary.bias": getattr(model, "reward_head_bias")
+                    })
+            # load reward model
+            if self.stage == "ppo":
+                if getattr(model, "is_peft_model", False):
+                    model.pretrained_model.load_adapter(self.reward_model, "reward")
+                assert load_valuehead_params(model, self.reward_model), "Reward model is not correctly loaded."
+
+        # Prepare model for inference
+        if not self.is_trainable:
+            model.requires_grad_(False)
+            if self.quantization_bit is None:
+                model = model.to(self.compute_dtype)
+
+        trainable_params, all_param = count_parameters(model)
+        
+        self.logger.info("trainable params: {:d} || all params: {:d} || trainable%: {:.4f}".format(
+            trainable_params, all_param, 100 * trainable_params / all_param
+        ))
+
+        if not self.is_trainable:
+            self.logger.info(
+                "This IS expected that the trainable params is 0 if you are using model for inference only.")
+
+        self.inst = model
 
         if self.print_model_structure:
             self.logger.info("model", self.inst)
-
-
-class LoraConfig(Task):
-
-    def __init__(self, config):
-        super(LoraConfig, self).__init__(config)
-
-        target_modules = self.get_config_list("target_modules")
-        params = self.get_section_params()
-        params["target_modules"] = target_modules
-
-        self.params = params
-
-    def main_handle(self):
-        self.inst = peft.LoraConfig(**self.params)
 
 
 class AdapterLoader(Task):
@@ -191,7 +236,8 @@ class AdapterLoader(Task):
 
         self.model = self.get_instance("model")
         self.config_checkpoint_dir = self.get_config_list("config_checkpoint_dir")
-        self.lora_config = self.get_instance("lora_config")
+
+        self.lora_config = self.load_lora_config()
 
     def main_handle(self):
         if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
@@ -204,3 +250,15 @@ class AdapterLoader(Task):
             if id(model.peft_config) != id(model.base_model.peft_config):
                 model.base_model.peft_config = model.peft_config
         self.inst = model
+
+    def load_lora_config(self):
+        params = self.get_section_params()
+        lora_params = {}
+        for k in params:
+            if k.startswith("lora_config"):
+                v = params[k]
+                k = k.split("lora_config_")[1]
+                if k == "target_modules":
+                    v = [i.strip() for i in v.split(",")]
+                lora_params[k] = v
+        return peft.LoraConfig(**lora_params)

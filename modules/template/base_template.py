@@ -151,3 +151,27 @@ class Llama2Template(Template):
             resp_ids = self._convert_inputs_to_ids(tokenizer, context=[resp])
             encoded_pairs.append((bos_ids + query_ids, resp_ids + eos_ids))
         return encoded_pairs
+
+
+def get_template_and_fix_tokenizer(
+        name: str,
+        tokenizer: "PreTrainedTokenizer"
+) -> Template:
+    if tokenizer.eos_token_id is None:
+        tokenizer.eos_token = "<|endoftext|>"
+        logger.info("Add eos token: {}".format(tokenizer.eos_token))
+
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        logger.info("Add pad token: {}".format(tokenizer.pad_token))
+
+    if name is None:
+        return None
+
+    template = templates.get(name, None)
+    assert template is not None, "Template {} does not exist.".format(name)
+    tokenizer.add_special_tokens(
+        dict(additional_special_tokens=template.stop_words),
+        replace_additional_special_tokens=False
+    )
+    return template

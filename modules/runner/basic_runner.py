@@ -23,6 +23,8 @@ class Task(object):
         self.logger = Logger(self.name)
 
         self.proxies = self.load_proxies()
+        self.stage = self.config.get("Project", "stage", fallback=None)
+        self.checkpoint_dir = self.config.get("Project", "checkpoint_dir", fallback=None)
 
     def load_proxies(self):
         res = {}
