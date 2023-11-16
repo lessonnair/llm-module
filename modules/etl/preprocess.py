@@ -5,19 +5,31 @@ from itertools import chain
 from ..util.constants import IGNORE_INDEX
 
 
-def construct_example(examples: Dict[str, List[Any]]) -> Generator[Any, None, None]:
-    for i in range(len(examples["prompt"])):
-        query, response = examples["prompt"][i], examples["response"][i]
-        if "query" in examples and examples["query"][i]:
-            query = query + "\n" + examples["query"][i]
-        history = examples["history"][i] if "history" in examples else None
-        system = examples["system"][i] if "system" in examples else None
+def construct_example(examples: Dict[str, List[Any]],
+                      prompt_column="prompt",
+                      query_column="query",
+                      history_column="history",
+                      response_column="response",
+                      system_column="system"
+                      ) -> Generator[Any, None, None]:
+    for i in range(len(examples[prompt_column])):
+        query, response = examples[prompt_column][i], examples[response_column][i]
+        if query_column in examples and examples[query_column][i]:
+            query = query + "\n" + examples[query_column][i]
+        history = examples[history_column][i] if history_column in examples else None
+        system = examples[system_column][i] if system_column in examples else None
         yield query, response, history, system
 
 
 def preprocess_pretrain_dataset(tokenizer,
                                 examples: Dict[str, List[Any]],
-                                cutoff_len) -> Dict[str, Any]:
+                                cutoff_len,
+                                prompt_column="prompt",
+                                query_column="query",
+                                history_column="history",
+                                response_column="response",
+                                system_column="system"
+                                ) -> Dict[str, Any]:
     # build grouped texts with format `X1 X2 X3 ...`
     kwargs = dict(add_special_tokens=True)
 
@@ -26,7 +38,7 @@ def preprocess_pretrain_dataset(tokenizer,
 
     tokenizer.pad_token = tokenizer.eos_token
 
-    tokenized_examples = tokenizer(examples["instruction"], **kwargs)
+    tokenized_examples = tokenizer(examples[prompt_column], **kwargs)
     concatenated_examples = {k: list(chain(*tokenized_examples[k])) for k in tokenized_examples.keys()}
     total_length = len(concatenated_examples[list(concatenated_examples.keys())[0]])
     block_size = cutoff_len
@@ -44,12 +56,22 @@ def preprocess_supervised_dataset(template,
                                   tokenizer,
                                   cutoff_len,
                                   train_on_prompt,
-                                  examples: Dict[str, List[Any]]):
+                                  examples: Dict[str, List[Any]],
+                                  prompt_column="prompt",
+                                  query_column="query",
+                                  history_column="history",
+                                  response_column="response",
+                                  system_column="system"):
     # build inputs with format `<bos> X Y <eos>` and labels with format `<ignore> ... <ignore> Y <eos>`
     # for multiturn examples, we only mask the prompt part in each prompt-response pair.
     model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
 
-    for query, response, history, system in construct_example(examples):
+    for query, response, history, system in construct_example(examples,
+                                                              prompt_column=prompt_column,
+                                                              query_column=query_column,
+                                                              history_column=history_column,
+                                                              response_column=response_column,
+                                                              system_column=system_column):
         input_ids, labels = [], []
 
         for turn_idx, (source_ids, target_ids) in enumerate(template.encode_multiturn(
@@ -93,12 +115,22 @@ def preprocess_packed_supervised_dataset(template,
                                          tokenizer,
                                          cutoff_len,
                                          train_on_prompt,
-                                         examples: Dict[str, List[Any]]) -> Dict[str, Any]:
+                                         examples: Dict[str, List[Any]],
+                                         prompt_column="prompt",
+                                         query_column="query",
+                                         history_column="history",
+                                         response_column="response",
+                                         system_column="system") -> Dict[str, Any]:
     # build inputs with format `<bos> X1 Y1 <eos> <bos> X2 Y2 <eos>`
     # and labels with format `<ignore> ... <ignore> Y1 <eos> <ignore> ... <ignore> Y2 <eos>`
     model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
     input_ids, labels = [], []
-    for query, response, history, system in construct_example(examples):
+    for query, response, history, system in construct_example(examples,
+                                                              prompt_column=prompt_column,
+                                                              query_column=query_column,
+                                                              history_column=history_column,
+                                                              response_column=response_column,
+                                                              system_column=system_column):
         for turn_idx, (source_ids, target_ids) in enumerate(template.encode_multiturn(
                 tokenizer, query, response, history, system
         )):
@@ -131,11 +163,21 @@ def preprocess_unsupervised_dataset(template,
                                     tokenizer,
                                     cutoff_len,
                                     train_on_prompt,
-                                    examples: Dict[str, List[Any]]) -> Dict[str, Any]:
+                                    examples: Dict[str, List[Any]],
+                                    prompt_column="prompt",
+                                    query_column="query",
+                                    history_column="history",
+                                    response_column="response",
+                                    system_column="system") -> Dict[str, Any]:
     # build inputs with format `<bos> X` and labels with format `Y <eos>`
     model_inputs = {"input_ids": [], "attention_mask": [], "label": []}
 
-    for query, response, history, system in construct_example(examples):
+    for query, response, history, system in construct_example(examples,
+                                                              prompt_column=prompt_column,
+                                                              query_column=query_column,
+                                                              history_column=history_column,
+                                                              response_column=response_column,
+                                                              system_column=system_column):
         input_ids, labels = template.encode_oneturn(tokenizer, query, response, history, system)
 
         if template.efficient_eos:
@@ -155,10 +197,20 @@ def preprocess_unsupervised_dataset(template,
 def preprocess_pairwise_dataset(template,
                                 tokenizer,
                                 cutoff_len,
-                                examples: Dict[str, List[Any]]):
+                                examples: Dict[str, List[Any]],
+                                prompt_column="prompt",
+                                query_column="query",
+                                history_column="history",
+                                response_column="response",
+                                system_column="system"):
     # build input pairs with format `<bos> X`, `Y1 <eos>` and `Y2 <eos>`
     model_inputs = {"prompt_ids": [], "chosen_ids": [], "rejected_ids": []}
-    for query, response, history, system in construct_example(examples):
+    for query, response, history, system in construct_example(examples,
+                                                              prompt_column=prompt_column,
+                                                              query_column=query_column,
+                                                              history_column=history_column,
+                                                              response_column=response_column,
+                                                              system_column=system_column):
         prompt_ids, chosen_ids = template.encode_oneturn(tokenizer, query, response[0], history, system)
         _, rejected_ids = template.encode_oneturn(tokenizer, query, response[1], history, system)
 

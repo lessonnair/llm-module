@@ -4,3 +4,5 @@ accelerate>=0.21.0
 datasets>=2.12.0
 peft>=0.4.0
 tiktoken
+safetensors
+trl

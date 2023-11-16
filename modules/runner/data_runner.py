@@ -23,6 +23,12 @@ class DatasetLoader(Task):
         self.cutoff_len = self.pop_dict(params, "cutoff_len")
         self.sft_packing = self.pop_dict(params, "sft_packing")
 
+        self.prompt_column = self.pop_dict(params, "prompt_column")
+        self.query_column = self.pop_dict(params, "query_column")
+        self.history_column = self.pop_dict(params, "history_column")
+        self.response_column = self.pop_dict(params, "response_column")
+        self.system_column = self.pop_dict(params, "system_column")
+
         template = self.pop_dict(params, "template")
 
         if template is not None:
@@ -40,13 +46,22 @@ class DatasetLoader(Task):
         dataset = load_dataset(self.path, **self.params)
         column_names = list(next(iter(dataset)).keys())
 
+        data_kwargs = {
+            "prompt_column": self.prompt_column,
+            "query_column": self.query_column,
+            "history_column": self.history_column,
+            "response_column": self.response_column,
+            "system_column": self.system_column
+        }
+
         if self.stage == "pt":
             def preprocess_func(examples):
                 return preprocess_pretrain_dataset(self.tokenizer,
                                                    examples,
-                                                   self.cutoff_len)
+                                                   self.cutoff_len,
+                                                   **data_kwargs)
 
-            dataset = dataset.filter(lambda example: example["instruction"])
+            dataset = dataset.filter(lambda example: example[self.prompt_column])
         elif self.stage == "sft":
             def preprocess_func(examples):
                 if self.sft_packing:
@@ -57,16 +72,25 @@ class DatasetLoader(Task):
                                                   self.tokenizer,
                                                   self.cutoff_len,
                                                   self.train_on_prompt,
-                                                  examples)
-            dataset = dataset.filter(lambda example: example["prompt"] and example["response"])
+                                                  examples,
+                                                  **data_kwargs)
+
+            dataset = dataset.filter(lambda example: example[self.prompt_column] and example[self.response_column])
         elif self.stage == "rm":
             def preprocess_func(examples):
-                return preprocess_pairwise_dataset(examples)
-            dataset = dataset.filter(lambda example: example["prompt"] and len(example["response"]) > 1)
+                return preprocess_pairwise_dataset(self.template,
+                                                   self.tokenizer,
+                                                   self.cutoff_len,
+                                                   examples,
+                                                   **data_kwargs)
+
+            dataset = dataset.filter(
+                lambda example: example[self.prompt_column] and len(example[self.response_column]) > 1)
         else:
             def preprocess_func(examples):
-                return preprocess_unsupervised_dataset(examples)
-            dataset = dataset.filter(lambda example: example["prompt"])
+                return preprocess_unsupervised_dataset(examples, **data_kwargs)
+
+            dataset = dataset.filter(lambda example: example[self.prompt_column])
 
         if not self.streaming:
             kwargs = dict(

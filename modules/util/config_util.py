@@ -2,7 +2,7 @@
 
 import configparser
 import re
-from .util import *
+from modules.util.util import *
 
 SCIENTIFIC_NOTATION_PATTERN = re.compile("^([\\+|-]?\\d+(.{0}|.\\d+))[Ee]{1}([\\+|-]?\\d+)$")
 
@@ -71,7 +71,8 @@ class TaskConfig(object):
 
 
 if __name__ == '__main__':
-    config = TaskConfig("../../example/trainer.ini")
+    config = TaskConfig("../../config/template.ini")
 
-    print(config.get_section_field_value("AutoTokenizerLoader", "pretrained_model_name_or_path"))
-    print(config.get_section_kvs("AutoTokenizerLoader"))
+    # print(config.get_section_field_value("vanilla", "pretrained_model_name_or_path"))
+    params = config.get_section_kvs("llama2")
+    pass
