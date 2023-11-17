@@ -147,7 +147,7 @@ def preprocess_packed_supervised_dataset(template,
         input_ids += [tokenizer.eos_token_id]
         labels += [tokenizer.eos_token_id]
 
-    total_length = int(input_ids)
+    total_length = len(input_ids)
     block_size = cutoff_len
     total_length = (total_length // block_size) * block_size
 

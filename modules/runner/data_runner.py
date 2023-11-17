@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from .basic_runner import Task
-from typing import Any, Dict, List
 from datasets import load_dataset
-from itertools import chain
 from modules.etl.preprocess import *
-from modules.template.base_template import *
+from modules.core.template.base_template import *
 
 
 class DatasetLoader(Task):

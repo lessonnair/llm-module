@@ -4,7 +4,12 @@ from .basic_runner import Task
 from modules.util.package_util import import_package
 import math
 import transformers
+from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling, DataCollatorWithPadding
 from modules.util.ploting import plot_loss
+from modules.util.constants import *
+from modules.extras.collator import *
+from modules.core.trainer import *
+from modules.util.metric_util import *
 
 
 class TrainingArguments(Task):
@@ -20,24 +25,6 @@ class TrainingArguments(Task):
         )
 
 
-class DataCollator(Task):
-
-    def __init__(self, config):
-        super(DataCollator, self).__init__(config)
-
-        self.tokenizer = self.get_instance("tokenizer")
-
-        params = self.get_section_params()
-        params.pop("tokenizer")
-        self.params = params
-
-    def main_handle(self):
-        self.inst = self.get_inst_clazz()(
-            tokenizer=self.tokenizer,
-            **self.params
-        )
-
-
 class Trainer(Task):
 
     def __init__(self, config):
@@ -46,8 +33,7 @@ class Trainer(Task):
         self.model = self.get_instance("model")
         self.tokenizer = self.get_instance("tokenizer")
         self.args = self.get_instance("args")
-        self.data_collator = self.get_instance("data_collator")
-        self.stage = self.get_config_list("stage")
+        self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
         self.output_dir = self.get_config("output_dir")
@@ -57,6 +43,10 @@ class Trainer(Task):
         self.split_train_val_val_size = self.get_config("split_train_val_val_size")
         self.split_train_val_seed = self.get_config("split_train_val_seed")
         self.split_train_val_buffer_size = self.get_config("split_train_val_buffer_size")
+        self.ignore_pad_token_for_loss = self.get_config("ignore_pad_token_for_loss")
+        self.predict_with_generate = self.get_config("predict_with_generate", False)
+
+        self.data_collator = self.init_data_collator()
 
     def split_dataset(self, dataset):
         res = {}
@@ -81,6 +71,30 @@ class Trainer(Task):
             res = {"train_dataset": dataset}
         return res
 
+    def init_data_collator(self):
+        data_collator = None
+        if self.stage == "sft":
+            data_collator = DataCollatorForSeq2Seq(
+                tokenizer=self.tokenizer,
+                pad_to_multiple_of=4,  # for shift short attention
+                label_pad_token_id=IGNORE_INDEX if self.ignore_pad_token_for_loss else self.tokenizer.pad_token_id
+            )
+        elif self.stage == "pt":
+            data_collator = DataCollatorForLanguageModeling(
+                tokenizer=self.tokenizer,
+                mlm=False
+            )
+        elif self.stage == "ppo":
+            data_collator = DPODataCollatorWithPadding(
+                tokenizer=self.tokenizer,
+                pad_to_multiple_of=4,
+                label_pad_token_id=IGNORE_INDEX if self.ignore_pad_token_for_loss else self.tokenizer.pad_token_id
+            )
+        elif self.stage == "rm":
+            data_collator = PairwiseDataCollatorWithPadding(self.tokenizer, pad_to_multiple_of=4)
+
+        return data_collator
+
     def main_handle(self):
         tmp = self.get_instance("dataset")
         datasets = self.split_dataset(self.get_instance("dataset"))
@@ -92,15 +106,34 @@ class Trainer(Task):
                 self.model.eval()
                 dataset = {"eval_dataset": datasets.values[0]}
 
-        trainer = transformers.Trainer(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            args=self.args,
-            data_collator=self.data_collator,
-            **datasets
-        )
+        trainer = None
 
-        if "train" in self.stage:
+        common_params = {
+            "model": self.model,
+            "tokenizer": self.tokenizer,
+            "args": self.args,
+            "data_collator": self.data_collator,
+        }
+        common_params.update(datasets)
+
+        gen_params = {}
+
+        if self.stage in ["rm"]:
+            common_params["compute_metrics"] = compute_accuracy
+            trainer_clazz = PairwiseTrainer
+        elif self.stage in ["sft"]:
+            common_params["compute_metrics"] = ComputeMetrics(self.tokenizer) if self.predict_with_generate else None
+            trainer_clazz = SFTSeq2SeqTrainer
+
+            gen_params["eos_token_id"] = [self.tokenizer.eos_token_id] + self.tokenizer.additional_special_tokens_ids
+            gen_params["pad_token_id"] = self.tokenizer.pad_token_id
+
+        else:
+            trainer_clazz = transformers.Trainer
+            
+        trainer = trainer_clazz(**common_params)
+
+        if "train" in self.steps:
             train_result = trainer.train(resume_from_checkpoint=self.resume_from_checkpoint)
             trainer.log_metrics("train", train_result.metrics)
             trainer.save_metrics("train", train_result.metrics)
@@ -109,8 +142,8 @@ class Trainer(Task):
             # if trainer.is_world_process_zero() and self.plot_loss:
             #     plot_loss(self.output_dir, keys=["loss", "eval_loss"])
 
-        if "eval" in self.stage:
-            metrics = trainer.evaluate(metric_key_prefix="eval")
+        if "eval" in self.steps:
+            metrics = trainer.evaluate(metric_key_prefix="eval", **gen_params)
             try:
                 perplexity = math.exp(metrics["eval_loss"])
             except OverflowError:
@@ -119,3 +152,11 @@ class Trainer(Task):
             metrics["perplexity"] = perplexity
             trainer.log_metrics("eval", metrics)
             trainer.save_metrics("eval", metrics)
+
+        if "predict" in self.steps:
+            predictions = trainer.predict(datasets, metric_key_prefix="predict", **gen_params)
+            if self.predict_with_generate:
+                predictions.metrics.pop("predict_loss", None)
+            trainer.log_metrics("predict", predictions.metrics)
+            trainer.save_metrics("predict", predictions.metrics)
+            trainer.save_predictions(predictions)

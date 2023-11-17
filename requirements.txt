@@ -6,3 +6,6 @@ peft>=0.4.0
 tiktoken
 safetensors
 trl
+jieba
+rouge-chinese
+nltk
