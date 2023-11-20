@@ -144,16 +144,23 @@ class Trainer(Task):
 
         if "eval" in self.steps:
             metrics = trainer.evaluate(metric_key_prefix="eval", **gen_params)
-            try:
-                perplexity = math.exp(metrics["eval_loss"])
-            except OverflowError:
-                perplexity = float("inf")
+            if self.stage == "pt":
+                try:
+                    perplexity = math.exp(metrics["eval_loss"])
+                except OverflowError:
+                    perplexity = float("inf")
 
-            metrics["perplexity"] = perplexity
+                metrics["perplexity"] = perplexity
+            elif self.stage == "sft":
+                if self.predict_with_generate:
+                    metrics.pop("eval_loss", None)
             trainer.log_metrics("eval", metrics)
             trainer.save_metrics("eval", metrics)
 
-        if "predict" in self.steps:
+
+
+        if self.stage != "pt" and "predict" in self.steps:
+
             predictions = trainer.predict(datasets, metric_key_prefix="predict", **gen_params)
             if self.predict_with_generate:
                 predictions.metrics.pop("predict_loss", None)
