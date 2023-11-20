@@ -21,8 +21,8 @@ except ImportError:  # https://github.com/huggingface/transformers/releases/tag/
 
 class TokenizerLoader(Task):
 
-    def __init__(self, config):
-        super(TokenizerLoader, self).__init__(config)
+    def __init__(self, config, name=None):
+        super(TokenizerLoader, self).__init__(config, name=name)
 
         self.model_path = self.get_config("pretrained_model_name_or_path")
         params = self.get_section_params()
@@ -227,7 +227,7 @@ class ModelLoader(Task):
                 model = model.to(self.compute_dtype)
 
         trainable_params, all_param = count_parameters(model)
-        
+
         self.logger.info("trainable params: {:d} || all params: {:d} || trainable%: {:.4f}".format(
             trainable_params, all_param, 100 * trainable_params / all_param
         ))
