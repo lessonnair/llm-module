@@ -14,8 +14,8 @@ from modules.util.metric_util import *
 
 class TrainingArguments(Task):
 
-    def __init__(self, config):
-        super(TrainingArguments, self).__init__(config)
+    def __init__(self, config, name=None):
+        super(TrainingArguments, self).__init__(config, name=name)
 
         self.params = self.get_section_params()
 
@@ -27,8 +27,8 @@ class TrainingArguments(Task):
 
 class Trainer(Task):
 
-    def __init__(self, config):
-        super(Trainer, self).__init__(config)
+    def __init__(self, config, name=None):
+        super(Trainer, self).__init__(config, name=name)
 
         self.model = self.get_instance("model")
         self.tokenizer = self.get_instance("tokenizer")
@@ -130,7 +130,7 @@ class Trainer(Task):
 
         else:
             trainer_clazz = transformers.Trainer
-            
+
         trainer = trainer_clazz(**common_params)
 
         if "train" in self.steps:
