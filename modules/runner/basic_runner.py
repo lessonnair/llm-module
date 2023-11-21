@@ -55,7 +55,7 @@ class Task(object):
         if inst is not None:
             return inst
         else:
-            if re.match("^DatasetLoader_[0-9]+$", key):
+            if re.match("(^DatasetLoader_[0-9]+$)|(^Trainer_[0-9]+$)|(^TrainingArguments_[0-9]+$)", key):
                 class_name = key.split("_")[0]
                 task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key)
             else:

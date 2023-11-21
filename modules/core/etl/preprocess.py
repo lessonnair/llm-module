@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Generator, List
 from itertools import chain
-from ..util.constants import IGNORE_INDEX
+from modules.util.constants import IGNORE_INDEX
 
 
 def construct_example(examples: Dict[str, List[Any]],

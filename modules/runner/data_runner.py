@@ -2,8 +2,8 @@
 
 from .basic_runner import Task
 from datasets import load_dataset
-from modules.etl.preprocess import *
 from modules.core.template.base_template import *
+from trl.trainer import ConstantLengthDataset
 
 
 class DatasetLoader(Task):
@@ -102,4 +102,5 @@ class DatasetLoader(Task):
             remove_columns=column_names,
             **kwargs
         )
+
         self.inst = dataset
