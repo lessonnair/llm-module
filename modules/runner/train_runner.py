@@ -161,7 +161,7 @@ class Trainer(Task):
 
         if self.stage != "pt" and "predict" in self.steps:
 
-            predictions = trainer.predict(datasets, metric_key_prefix="predict", **gen_params)
+            predictions = trainer.predict(datasets["eval_dataset"], metric_key_prefix="predict", **gen_params)
             if self.predict_with_generate:
                 predictions.metrics.pop("predict_loss", None)
             trainer.log_metrics("predict", predictions.metrics)
