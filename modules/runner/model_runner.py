@@ -38,6 +38,10 @@ class TokenizerLoader(Task):
             self.model_path,
             **self.params
         )
+
+        if getattr(tokenizer, "pad_token", None) is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            
         if getattr(config, "model_type", None) == "chatglm":
             tokenizer._pad = MethodType(PreTrainedTokenizerBase._pad, tokenizer)
 

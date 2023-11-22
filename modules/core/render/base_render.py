@@ -5,8 +5,8 @@ from modules.util.custom_log import get_logger
 from modules.util.config_util import render_config
 from typing import Dict, List, Optional, Tuple, Union
 
-
 logger = get_logger(__name__)
+
 
 class Render(object):
 
@@ -78,6 +78,7 @@ class Render(object):
         prompt_ids += pairs[-1][0]
         answer_ids = pairs[-1][1]
         return prompt_ids, answer_ids
+
     def render(self,
                tokenizer: "PreTrainedTokenizer",
                context: List[Union[str, Dict[str, str]]],
@@ -104,7 +105,6 @@ class Render(object):
         return token_ids
 
 
-if __name__=='__main__':
-
+if __name__ == '__main__':
     render = Render("chatglm2")
     pass
