@@ -49,11 +49,15 @@ class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
 class PairwiseDataCollatorWithPadding(DataCollatorWithPadding):
 
     def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        features = [
-            {
-                "input_ids": feature["prompt_ids"] + feature[key],
-                "attention_mask": [1] * (len(feature["prompt_ids"]) + len(feature[key]))
-            }
-            for key in ("chosen_ids", "rejected_ids") for feature in features
-        ]
-        return super().__call__(features)
+
+        res = []
+        for feature in features:
+            for key in ("chosen_ids", "rejected_ids"):
+                res.append(
+                    {
+                        "input_ids": feature["input_ids"] + feature[key],
+                        "attention_mask": [1] * (len(feature["input_ids"]) + len(feature[key]))
+                    }
+                )
+        
+        return super().__call__(res)

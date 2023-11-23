@@ -157,8 +157,6 @@ class Trainer(Task):
             trainer.log_metrics("eval", metrics)
             trainer.save_metrics("eval", metrics)
 
-
-
         if self.stage != "pt" and "predict" in self.steps:
 
             predictions = trainer.predict(datasets["eval_dataset"], metric_key_prefix="predict", **gen_params)

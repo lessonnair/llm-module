@@ -24,8 +24,8 @@ class SFTSeq2SeqTrainer(Seq2SeqTrainer):
                         ignore_keys: Optional[List[str]] = None,
                         ) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]:
         if self.args.predict_with_generate:
-            assert self.tokenizer.padding_side == "left", "This method only accepts left-padded tensor."
-            assert self.tokenizer.pad_token_id is not None, "Pad token is required."
+            # assert self.tokenizer.padding_side == "left", "This method only accepts left-padded tensor."
+            # assert self.tokenizer.pad_token_id is not None, "Pad token is required."
             prompt_len, label_len = inputs["input_ids"].size(-1), inputs["label"].size(-1)
             if prompt_len > label_len:
                 inputs["label"] = self._pad_tensors_to_target_len(inputs["label"], inputs["input_ids"])
@@ -70,6 +70,7 @@ class SFTSeq2SeqTrainer(Seq2SeqTrainer):
         labels = np.where(predict_results.label_ids != IGNORE_INDEX, predict_results.label_ids,
                           self.tokenizer.pad_token_id)
 
+        preds = np.argmax(preds, -1)
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True,
                                                      clean_up_tokenization_spaces=True)

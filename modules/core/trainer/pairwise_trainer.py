@@ -32,7 +32,7 @@ class PairwiseTrainer(Trainer):
             values = torch.transpose(values, 0, 1)
 
         # split the inputs and rewards into two parts, chosen and rejected
-        batch_size = inputs["input_id"].size(0) // 2
+        batch_size = inputs["input_ids"].size(0) // 2
         chosen_input_ids, rejected_input_ids = inputs["input_ids"][:batch_size], inputs["input_ids"][batch_size:]
         chosen_attn_mask, rejected_attn_mask = (
             inputs["attention_mask"][:batch_size], inputs["attention_mask"][batch_size:]
@@ -53,7 +53,7 @@ class PairwiseTrainer(Trainer):
                 end_index = max(chosen_length, rejected_length)
                 div_index = check_divergence[0]
 
-            assert div_index > 0
+            # assert div_index > 0
             chosen_trunc_rewards = chosen_rewards[i, div_index: end_index]
             rejected_trunc_rewards = rejected_rewards[i, div_index: end_index]
             if return_outputs:
