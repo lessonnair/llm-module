@@ -26,9 +26,9 @@ class SFTSeq2SeqTrainer(Seq2SeqTrainer):
         if self.args.predict_with_generate:
             # assert self.tokenizer.padding_side == "left", "This method only accepts left-padded tensor."
             # assert self.tokenizer.pad_token_id is not None, "Pad token is required."
-            prompt_len, label_len = inputs["input_ids"].size(-1), inputs["label"].size(-1)
+            prompt_len, label_len = inputs["input_ids"].size(-1), inputs["labels"].size(-1)
             if prompt_len > label_len:
-                inputs["label"] = self._pad_tensors_to_target_len(inputs["label"], inputs["input_ids"])
+                inputs["labels"] = self._pad_tensors_to_target_len(inputs["labels"], inputs["input_ids"])
             if label_len > prompt_len:
                 inputs["input_ids"] = self._pad_tensors_to_target_len(inputs["input_ids"], inputs["labels"])
                 if "attention_mask" in inputs:

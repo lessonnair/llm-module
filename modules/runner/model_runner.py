@@ -83,14 +83,28 @@ class ModelLoader(Task):
         self.quantization_bit = self.pop_dict(params, "quantization_bit")
         self.double_quantization = self.pop_dict(params, "double_quantization", None)
         self.quantization_type = self.pop_dict(params, "quantization_type", None)
-
         self.reward_model = self.pop_dict(params, "reward_model")
+        self.config_checkpoint_dir = self.pop_dict(params, "config_checkpoint_dir")
+
+        self.type = self.pop_dict(params, "type")
+        self.lora_config = self.load_lora_config(params)
 
         self.config_kwargs = config_kwargs
         self.params = params
 
         if len(self.proxies) > 0:
             self.config_kwargs["proxies"] = self.proxies
+
+    def load_lora_config(self, params):
+        lora_params = {}
+        for k in list(params.keys()):
+            if k.startswith("lora_config"):
+                v = self.pop_dict(params, k)
+                k = k.split("lora_config_")[1]
+                if k == "target_modules":
+                    v = [i.strip() for i in v.split(",")]
+                lora_params[k] = v
+        return peft.LoraConfig(**lora_params)
 
     def main_handle(self):
 
@@ -207,6 +221,22 @@ class ModelLoader(Task):
         if isinstance(model, PreTrainedModel) and "AutoModelForCausalLM" in getattr(config, "auto_map", {}):
             model.__class__.register_for_auto_class()
 
+        if self.type == "lora":
+            if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
+                for config_dir in self.config_checkpoint_dir:
+                    model = peft.PeftModel.from_pretrained(model, config_dir)
+                    model = model.merge_and_unload()
+                self.logger.info("Loaded {} model checkpoint(s).".format(len(self.config_checkpoint_dir)))
+            else:
+                model = peft.get_peft_model(model, self.lora_config)
+                if id(model.peft_config) != id(model.base_model.peft_config):
+                    model.base_model.peft_config = model.peft_config
+
+        if self.is_trainable:
+            model = model.train()
+        else:
+            model = model.eval()
+
         if self.stage in ("rm", "ppo"):
             from trl import AutoModelForCausalLMWithValueHead
             require_version("trl>=0.7.1", "To fix: pip install trl>=0.7.1")
@@ -226,6 +256,7 @@ class ModelLoader(Task):
                 if getattr(model, "is_peft_model", False):
                     model.pretrained_model.load_adapter(self.reward_model, "reward")
                 assert load_valuehead_params(model, self.reward_model), "Reward model is not correctly loaded."
+
 
         # Prepare model for inference
         if not self.is_trainable:
@@ -269,6 +300,7 @@ class AdapterLoader(Task):
             model = peft.get_peft_model(self.model, self.lora_config)
             if id(model.peft_config) != id(model.base_model.peft_config):
                 model.base_model.peft_config = model.peft_config
+
         self.inst = model
 
     def load_lora_config(self):
