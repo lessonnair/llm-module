@@ -10,6 +10,17 @@ from modules.util.constants import *
 from modules.extras.collator import *
 from modules.core.trainer import *
 from modules.util.metric_util import *
+from torch.optim import AdamW
+from transformers.optimization import get_scheduler
+
+class PPOArguments(Task):
+
+    def __init__(self, config, name=None):
+        super(PPOArguments, self).__init__(config, name=name)
+        self.params = self.get_section_params(parse_json=True)
+
+    def main_handle(self):
+        self.inst = self.params
 
 
 class TrainingArguments(Task):
@@ -33,6 +44,7 @@ class Trainer(Task):
         self.model = self.get_instance("model")
         self.tokenizer = self.get_instance("tokenizer")
         self.args = self.get_instance("args")
+        self.ppo_args = self.get_instance("ppo_args")
         self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
@@ -45,6 +57,8 @@ class Trainer(Task):
         self.split_train_val_buffer_size = self.get_config("split_train_val_buffer_size")
         self.ignore_pad_token_for_loss = self.get_config("ignore_pad_token_for_loss")
         self.predict_with_generate = self.get_config("predict_with_generate", False)
+
+        self.args.predict_with_generate = self.predict_with_generate
 
         self.data_collator = self.init_data_collator()
 
@@ -128,6 +142,31 @@ class Trainer(Task):
             gen_params["eos_token_id"] = [self.tokenizer.eos_token_id] + self.tokenizer.additional_special_tokens_ids
             gen_params["pad_token_id"] = self.tokenizer.pad_token_id
 
+        elif self.stage in ["ppo"]:
+            from trl import PPOConfig
+            ppo_config_params = self.ppo_args
+            ppo_config_params["learning_rate"] = self.args.learning_rate
+            ppo_config_params["mini_batch_size"] = self.args.min_batch_size
+            ppo_config_params["batch_size"] = self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps
+            ppo_config_params["gradient_accumulation_steps"] = self.args.gradient_accumulation_steps
+            ppo_config_params["ppo_epochs"] = 1
+            ppo_config_params["max_grad_norm"] = self.args.max_grad_norm
+            ppo_config_params["seed"] = self.args.seed
+            ppo_config_params["optimize_cuda_cache"] = True
+
+            ppo_config = PPOConfig(**ppo_config_params)
+            optimizer = AdamW(filter(lambda p: p.requires_grad, self.model.parameters(), lr=self.args.learning_rate))
+            total_train_batch_size = (
+                    self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps * self.args.world_size
+            )
+            num_training_steps = self.args.num_train_epochs * math.ceil(len(datasets) / total_train_batch_size)
+            lr_scheduler = get_scheduler(
+                self.args.lr_scheduler_type,
+                optimizer=optimizer,
+                num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
+                num_training_steps=num_training_steps
+            )
+
         else:
             trainer_clazz = transformers.Trainer
 
@@ -158,7 +197,6 @@ class Trainer(Task):
             trainer.save_metrics("eval", metrics)
 
         if self.stage != "pt" and "predict" in self.steps:
-
             predictions = trainer.predict(datasets["eval_dataset"], metric_key_prefix="predict", **gen_params)
             if self.predict_with_generate:
                 predictions.metrics.pop("predict_loss", None)

@@ -43,8 +43,8 @@ class Task(object):
         else:
             return default
 
-    def get_section_params(self):
-        params = self.config.get_section_kvs(self.name, empty_to_none=True)
+    def get_section_params(self, parse_json=False):
+        params = self.config.get_section_kvs(self.name, empty_to_none=True, parse_json=parse_json)
         if "class" in params:
             params.pop("class")
         return params

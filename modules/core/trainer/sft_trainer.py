@@ -9,6 +9,8 @@ from transformers import Seq2SeqTrainer
 from modules.util.constants import IGNORE_INDEX
 from modules.util.custom_log import get_logger
 
+from transformers import GPT2Model
+
 if TYPE_CHECKING:
     from transformers.trainer import PredictionOutput
 
@@ -43,7 +45,7 @@ class SFTSeq2SeqTrainer(Seq2SeqTrainer):
             model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
         )
         if generated_tokens is not None and self.args.predict_with_generate:
-            generated_tokens[:, :max(prompt_len, label_len)] = self.tokenizer.pad_token_id
+            generated_tokens[:, :-max(prompt_len, label_len)] = self.tokenizer.pad_token_id
             generated_tokens = generated_tokens.contiguous()
 
         return loss, generated_tokens, labels
@@ -70,7 +72,8 @@ class SFTSeq2SeqTrainer(Seq2SeqTrainer):
         labels = np.where(predict_results.label_ids != IGNORE_INDEX, predict_results.label_ids,
                           self.tokenizer.pad_token_id)
 
-        preds = np.argmax(preds, -1)
+        if len(preds.shape) == 3:
+            preds = np.argmax(preds, -1)
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True,
                                                      clean_up_tokenization_spaces=True)
