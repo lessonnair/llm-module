@@ -30,7 +30,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         self.generation_config = GenerationConfig(
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=[self.tokenizer.eos_token_id] + self.tokenizer.additional_special_tokens_ids,
-            **generating_args.to_dict()
+            **generating_args
         )
         self.state = TrainerState()
         self.control = TrainerControl()
@@ -136,7 +136,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
 
     @torch.no_grad()
     def get_inputs(self, batch: Dict[str, torch.Tensor]) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-        if self.model_args.upcast_layernorm:
+        if self.model_args.get("upcast_layernorm"):
             layernorm_params = dump_layernorm(self.model)
 
         unwrapped_model: "AutoModelForCausalLMWithValueHead" = self.accelerator.unwrap_model(self.model)
@@ -146,7 +146,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
             **batch
         )
 
-        if self.model_args.upcast_layernorm:
+        if self.model_args.get("upcast_layernorm"):
             restore_layernorm(self.model, layernorm_params)
 
         query = batch["input_ids"].detach().cpu()
@@ -154,7 +154,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         queries, responses = [], []
         for i in range(len(query)):
             query_length = (query[i] != self.tokenizer.pad_token_id).nonzero()[0]
-            response_index = (response[i] != self.tokenizer.pad_token_id).nonzero()
+            response_index = (response[i] != self.tokenizer.pad_token_id).nonzero()[0]
 
             if response_index == 0:
                 response_length = 1

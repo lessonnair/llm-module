@@ -125,14 +125,12 @@ class Trainer(Task):
                 self.model.eval()
                 dataset = {"eval_dataset": datasets.values[0]}
 
-        trainer = None
-
         common_params = {
             "model": self.model,
             "tokenizer": self.tokenizer,
             "args": self.args,
             "data_collator": self.data_collator,
-            "callbacks": [SavePeftModelCallback()]
+            "callbacks": [LogCallback(), SavePeftModelCallback()]
         }
         common_params.update(datasets)
 
@@ -158,9 +156,9 @@ class Trainer(Task):
             ppo_config_params["ppo_epochs"] = 1
             ppo_config_params["max_grad_norm"] = self.args.max_grad_norm
             ppo_config_params["seed"] = self.args.seed
+            ppo_config_params["remove_unused_columns"] = False
 
             ppo_config = PPOConfig(**ppo_config_params)
-            params = self.model.parameters()
             optimizer = AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.args.learning_rate)
             total_train_batch_size = (
                     self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps * self.args.world_size
@@ -190,7 +188,7 @@ class Trainer(Task):
             common_params.update({
                 "model_args": model_args,
                 "generating_args": generating_args,
-                "config": ppo_config_params,
+                "config": ppo_config,
                 "ref_model": None,
                 "optimizer": optimizer,
                 "lr_scheduler": lr_scheduler
@@ -203,13 +201,21 @@ class Trainer(Task):
         trainer = trainer_clazz(**common_params)
 
         if "train" in self.steps:
-            train_result = trainer.train(resume_from_checkpoint=self.resume_from_checkpoint)
-            trainer.log_metrics("train", train_result.metrics)
-            trainer.save_metrics("train", train_result.metrics)
-            trainer.save_state()
-            trainer.save_model()
-            # if trainer.is_world_process_zero() and self.plot_loss:
-            #     plot_loss(self.output_dir, keys=["loss", "eval_loss"])
+            if self.stage == "ppo":
+                trainer.ppo_train()
+                trainer.save_model()
+                trainer.save_state()  # must be called after save_model to have a folder
+                if trainer.is_world_process_zero() and self.plot_loss:
+                    plot_loss(self.args.output_dir, keys=["loss", "reward"])
+            else:
+
+                train_result = trainer.train(resume_from_checkpoint=self.resume_from_checkpoint)
+                trainer.log_metrics("train", train_result.metrics)
+                trainer.save_metrics("train", train_result.metrics)
+                trainer.save_state()
+                trainer.save_model()
+                if trainer.is_world_process_zero() and self.plot_loss:
+                    plot_loss(self.args.output_dir, keys=["loss", "eval_loss"])
 
         if "eval" in self.steps:
             metrics = trainer.evaluate(metric_key_prefix="eval", **gen_params)

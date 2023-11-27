@@ -14,10 +14,10 @@ class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
         label_positions = []
         for key in ("chosen_ids", "rejected_ids"):
             for feature in features:
-                prompt_len, answer_len = len(feature["prompt_ids"]), len(feature[key])
+                prompt_len, answer_len = len(feature["input_ids"]), len(feature[key])
 
                 concat_features.append({
-                    "input_ids": feature["prompt_ids"] + feature[key],
+                    "input_ids": feature["input_ids"] + feature[key],
                     "attention_mask": [1] * (prompt_len + answer_len)
                 })
 
