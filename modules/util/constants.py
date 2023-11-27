@@ -9,3 +9,5 @@ BASE_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), os.pardir, 
 RENDER_FILE_PATH = os.path.join(BASE_PATH, "config", "render.ini")
 
 LOG_PATH = os.path.join(BASE_PATH, "logs")
+
+LOG_FILE_NAME = "train_log"

@@ -66,7 +66,7 @@ class Render(object):
                 prefix_ids = sep_ids + bos_ids
 
             query_ids = self.render(tokenizer, context=self.prompt, query=query, idx=str(idx))
-            resp_ids = self.render(tokenizer, context=[resp])
+            resp_ids = self.render(tokenizer, context=resp)
             pairs.append((prefix_ids + query_ids, resp_ids + eos_ids))
 
         if multi_turn:

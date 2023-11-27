@@ -11,6 +11,8 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 from modules.util.constants import IGNORE_INDEX
 
+from transformers import InfNanRemoveLogitsProcessor, LogitsProcessorList
+
 if TYPE_CHECKING:
     from transformers.tokenization_utils import PreTrainedTokenizer
 
@@ -18,6 +20,24 @@ if TYPE_CHECKING:
 def compute_accuracy(eval_preds: Sequence[Union[np.ndarray, Tuple[np.ndarray]]]) -> Dict[str, float]:
     preds, _ = eval_preds
     return {"accuracy": (preds[0] > preds[1]).sum() / len(preds[0])}
+
+
+class AverageMeter:
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 
 @dataclass
@@ -51,3 +71,12 @@ class ComputeMetrics:
             score_dict["bleu-4"].append(round(bleu_score * 100, 4))
 
         return {k: float(np.mean(v)) for k, v in score_dict.items()}
+
+
+def get_logits_processor() -> LogitsProcessorList:
+    r"""
+    Gets logits processor that removes NaN and Inf logits.
+    """
+    logits_processor = LogitsProcessorList()
+    logits_processor.append(InfNanRemoveLogitsProcessor())
+    return logits_processor

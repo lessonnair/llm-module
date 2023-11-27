@@ -10,8 +10,10 @@ from modules.util.constants import *
 from modules.extras.collator import *
 from modules.core.trainer import *
 from modules.util.metric_util import *
+from modules.extras.callbacks import *
 from torch.optim import AdamW
 from transformers.optimization import get_scheduler
+
 
 class PPOArguments(Task):
 
@@ -110,8 +112,11 @@ class Trainer(Task):
         return data_collator
 
     def main_handle(self):
-        tmp = self.get_instance("dataset")
-        datasets = self.split_dataset(self.get_instance("dataset"))
+
+        if self.stage != "ppo":
+            datasets = self.split_dataset(self.get_instance("dataset"))
+        else:
+            datasets = {"dataset": self.get_instance("dataset")}
 
         self.model.train()
         if len(self.stage) == 1:
@@ -127,6 +132,7 @@ class Trainer(Task):
             "tokenizer": self.tokenizer,
             "args": self.args,
             "data_collator": self.data_collator,
+            "callbacks": [SavePeftModelCallback()]
         }
         common_params.update(datasets)
 
@@ -146,16 +152,16 @@ class Trainer(Task):
             from trl import PPOConfig
             ppo_config_params = self.ppo_args
             ppo_config_params["learning_rate"] = self.args.learning_rate
-            ppo_config_params["mini_batch_size"] = self.args.min_batch_size
-            ppo_config_params["batch_size"] = self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps
+            ppo_config_params[
+                "batch_size"] = self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps
             ppo_config_params["gradient_accumulation_steps"] = self.args.gradient_accumulation_steps
             ppo_config_params["ppo_epochs"] = 1
             ppo_config_params["max_grad_norm"] = self.args.max_grad_norm
             ppo_config_params["seed"] = self.args.seed
-            ppo_config_params["optimize_cuda_cache"] = True
 
             ppo_config = PPOConfig(**ppo_config_params)
-            optimizer = AdamW(filter(lambda p: p.requires_grad, self.model.parameters(), lr=self.args.learning_rate))
+            params = self.model.parameters()
+            optimizer = AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.args.learning_rate)
             total_train_batch_size = (
                     self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps * self.args.world_size
             )
@@ -166,6 +172,30 @@ class Trainer(Task):
                 num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
                 num_training_steps=num_training_steps
             )
+            model_args = {
+                "upcast_layernorm": True,
+                "compute_dtype": "fp16"
+            }
+            generating_args = {
+                "do_sample": True,
+                "temperature": 0.95,
+                "top_p": 0.7,
+                "top_k": 50,
+                "num_beams": 1,
+                "max_length": None,
+                "max_new_tokens": 512,
+                "repetition_penalty": 1.0,
+                "length_penalty": 1.0
+            }
+            common_params.update({
+                "model_args": model_args,
+                "generating_args": generating_args,
+                "config": ppo_config_params,
+                "ref_model": None,
+                "optimizer": optimizer,
+                "lr_scheduler": lr_scheduler
+            })
+            trainer_clazz = PPOTrainer
 
         else:
             trainer_clazz = transformers.Trainer

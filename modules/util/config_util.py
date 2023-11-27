@@ -11,6 +11,7 @@ SCIENTIFIC_NOTATION_PATTERN = re.compile("^([\\+|-]?\\d+(.{0}|.\\d+))[Ee]{1}([\\
 
 logger = get_logger(__name__)
 
+
 def read_config_file(config_path, encoding="utf-8"):
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     config.read(config_path, encoding=encoding)
@@ -64,10 +65,10 @@ class TaskConfig(object):
             res = False
         elif isFloat(v) or v.isdecimal() or SCIENTIFIC_NOTATION_PATTERN.match(v):
             res = eval(v)
-        elif parse_json:
-            res = json.loads(v)
         elif v == '' and empty_to_none:
             res = None
+        elif parse_json:
+            res = json.loads(v)
         return res
 
     def get_section_kvs(self, section_name,
@@ -89,7 +90,7 @@ class RenderConfig(object):
     def get_section_field_value(self, section_name, field_name):
         return self.config.get(section_name, field_name)
 
-    def parse_value(self, v, empty_to_none=False):
+    def parse_value(self, v, empty_to_none=False, parse_json=True):
         v = str(v)
         res = v
         if v == 'None':
@@ -102,7 +103,7 @@ class RenderConfig(object):
             res = eval(v)
         elif v == '' and empty_to_none:
             res = ''
-        else:
+        elif parse_json:
             try:
                 res = json.loads(v)
             except Exception as e:
@@ -119,7 +120,6 @@ class RenderConfig(object):
 
 
 render_config = RenderConfig(constants.RENDER_FILE_PATH)
-
 
 if __name__ == '__main__':
     config = TaskConfig("../../config/template.ini")

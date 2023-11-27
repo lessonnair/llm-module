@@ -68,7 +68,7 @@ class PairwiseTrainer(Trainer):
 
         return loss
 
-    def save_prediction(self, predict_results: "PredictionOutput"):
+    def save_predictions(self, predict_results: "PredictionOutput"):
         if not self.is_world_process_zero():
             return
 

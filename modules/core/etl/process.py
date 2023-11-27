@@ -171,7 +171,7 @@ class DataProcessor(object):
 
                 return result
             else:
-                result = {"input_ids": [], "attention_mask": [], "label": []}
+                result = {"input_ids": [], "attention_mask": [], "labels": []}
 
                 for query, response, history, system in self.construct_example(examples):
                     source_ids, labels = render.render_with_history(
