@@ -12,6 +12,7 @@ from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
 from modules.util.checkpoint_util import *
 from modules.util.analyze_util import *
+from modules.util.util import *
 
 try:
     from transformers.integrations import is_deepspeed_zero3_enabled
@@ -113,10 +114,7 @@ class ModelLoader(Task):
 
         if "torch_dtype" in self.params:
             torch_dtype = self.params["torch_dtype"]
-            for dtype_name, dtype in [("fp16", torch.float16), ("bf16", torch.bfloat16), ("fp32", torch.float32)]:
-                if torch_dtype == torch_dtype:
-                    self.params["torch_dtype"] = dtype
-                    break
+            self.params["torch_dtype"] = get_dtype(torch_dtype)
 
         # set rope scaling
         if self.rope_scaling is not None:

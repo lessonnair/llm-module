@@ -10,6 +10,7 @@ from modules.util.constants import *
 from modules.extras.collator import *
 from modules.core.trainer import *
 from modules.util.metric_util import *
+from modules.util.util import *
 from modules.extras.callbacks import *
 from torch.optim import AdamW
 from transformers.optimization import get_scheduler
@@ -172,7 +173,7 @@ class Trainer(Task):
             )
             model_args = {
                 "upcast_layernorm": True,
-                "compute_dtype": "fp16"
+                "compute_dtype": get_dtype("fp16")
             }
             generating_args = {
                 "do_sample": True,

@@ -84,6 +84,8 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
             unwrapped_model.config.use_cache = False
             self.model.train()
 
+            self.config.batch_size = len(batch)
+
             stats = self.step(queries, responses, rewards)
             self.tokenizer.padding_side = "left"
             loss_meter.update(float(stats["ppo/loss/total"]), n=len(rewards))
@@ -154,7 +156,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         queries, responses = [], []
         for i in range(len(query)):
             query_length = (query[i] != self.tokenizer.pad_token_id).nonzero()[0]
-            response_index = (response[i] != self.tokenizer.pad_token_id).nonzero()[0]
+            response_index = (response[i] != self.tokenizer.pad_token_id).nonzero()[-1]
 
             if response_index == 0:
                 response_length = 1
@@ -175,7 +177,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         replace_model(unwrapped_model, target="reward")
         batch = self.prepare_model_inputs(queries, responses)
 
-        with torch.cuda.amp.autocast(dtype=self.model_args.compute_dtype):  # support bf16
+        with torch.cuda.amp.autocast(dtype=self.model_args.get("compute_dtype")):  # support bf16
             _, _, values = self.model(**batch, output_hidden_states=True, return_dict=True)
 
         if values.size(0) != batch["input_ids"].size(0):
@@ -184,7 +186,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         rewards = []
         for i in range(values.size(0)):
             end_index = batch["attention_mask"][i].nonzero()[-1]
-            rewards.append(values[i: end_index].float().detach().cpu())
+            rewards.append(values[i, end_index].float().detach().cpu())
 
         replace_model(unwrapped_model, target="default")
         return rewards
@@ -221,7 +223,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
             input_ids = input_kwargs["input_ids"]
             attention_mask = input_kwargs["attention_mask"]
 
-            with torch.cuda.amp.autocast(dtype=self.model_args.compute_dtype):  # support bf16
+            with torch.cuda.amp.autocast(dtype=self.model_args.get("compute_dtype")):  # support bf16
                 logits, _, values = model(**input_kwargs)
 
             if values.size(0) != input_ids.size(0):  # adapt to chatglm2
