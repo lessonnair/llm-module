@@ -84,7 +84,7 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
             unwrapped_model.config.use_cache = False
             self.model.train()
 
-            self.config.batch_size = len(batch)
+            self.config.batch_size = len(batch[list(batch.data.keys())[0]])
 
             stats = self.step(queries, responses, rewards)
             self.tokenizer.padding_side = "left"

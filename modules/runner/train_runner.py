@@ -15,7 +15,6 @@ from modules.extras.callbacks import *
 from torch.optim import AdamW
 from transformers.optimization import get_scheduler
 
-
 class PPOArguments(Task):
 
     def __init__(self, config, name=None):
