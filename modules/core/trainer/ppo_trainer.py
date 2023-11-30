@@ -155,18 +155,18 @@ class PPOTrainer(trl.PPOTrainer, Trainer):
         response = response[:, batch["input_ids"].size(-1):].detach().cpu()
         queries, responses = [], []
         for i in range(len(query)):
-            query_length = (query[i] != self.tokenizer.pad_token_id).nonzero()[0]
-            response_index = (response[i] != self.tokenizer.pad_token_id).nonzero()[-1]
+            query_start_index = (query[i] != self.tokenizer.pad_token_id).nonzero()[0]
+            response_indexes = (response[i] != self.tokenizer.pad_token_id).nonzero()
 
-            if response_index == 0:
-                response_length = 1
+            if len(response_indexes) == 0:
+                response_end_index = 1
             elif self.tokenizer.pad_token_id == self.tokenizer.eos_token_id:
-                response_length = response_index[-1] + 2
+                response_end_index = response_indexes[-1] + 2
             else:
-                response_length = response_index[-1] + 1
+                response_end_index = response_indexes[-1] + 1
 
-            queries.append(query[i, query_length:])
-            responses.append(response[i, :response_length])
+            queries.append(query[i, query_start_index:])
+            responses.append(response[i, :response_end_index])
 
         return queries, responses
 

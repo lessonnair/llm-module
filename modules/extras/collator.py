@@ -37,11 +37,11 @@ class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
         padded_labels = []
         for feature, (prompt_len, answer_len) in zip(batch, positions):
             if self.tokenizer.padding_side == "left":
-                start, end = feature.size(0) - answer_len, feature.size(0)
+                answer_start_index, answer_end_index = feature.size(0) - answer_len, feature.size(0)
             else:
-                start, end = prompt_len, prompt_len + answer_len
+                answer_start_index, answer_end_index = prompt_len, prompt_len + answer_len
             padded_tensor = self.label_pad_token_id * torch.ones_like(feature)
-            padded_tensor[start: end] = feature[start: end]
+            padded_tensor[answer_start_index: answer_end_index] = feature[answer_start_index: answer_end_index]
             padded_labels.append(padded_tensor)
         return torch.stack(padded_labels, dim=0).contiguous()
 
@@ -59,5 +59,5 @@ class PairwiseDataCollatorWithPadding(DataCollatorWithPadding):
                         "attention_mask": [1] * (len(feature["input_ids"]) + len(feature[key]))
                     }
                 )
-        
+
         return super().__call__(res)
