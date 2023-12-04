@@ -15,28 +15,6 @@ from modules.extras.callbacks import *
 from torch.optim import AdamW
 from transformers.optimization import get_scheduler
 
-class PPOArguments(Task):
-
-    def __init__(self, config, name=None):
-        super(PPOArguments, self).__init__(config, name=name)
-        self.params = self.get_section_params(parse_json=True)
-
-    def main_handle(self):
-        self.inst = self.params
-
-
-class TrainingArguments(Task):
-
-    def __init__(self, config, name=None):
-        super(TrainingArguments, self).__init__(config, name=name)
-
-        self.params = self.get_section_params()
-
-    def main_handle(self):
-        self.inst = self.get_inst_clazz()(
-            **self.params
-        )
-
 
 class Trainer(Task):
 
@@ -47,6 +25,7 @@ class Trainer(Task):
         self.tokenizer = self.get_instance("tokenizer")
         self.args = self.get_instance("args")
         self.ppo_args = self.get_instance("ppo_args")
+        self.generate_args = self.get_instance("generate_args")
         self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
@@ -174,20 +153,10 @@ class Trainer(Task):
                 "upcast_layernorm": True,
                 "compute_dtype": get_dtype("fp16")
             }
-            generating_args = {
-                "do_sample": True,
-                "temperature": 0.95,
-                "top_p": 0.7,
-                "top_k": 50,
-                "num_beams": 1,
-                "max_length": None,
-                "max_new_tokens": 512,
-                "repetition_penalty": 1.0,
-                "length_penalty": 1.0
-            }
+
             common_params.update({
                 "model_args": model_args,
-                "generating_args": generating_args,
+                "generating_args": self.generate_args,
                 "config": ppo_config,
                 "ref_model": None,
                 "optimizer": optimizer,
