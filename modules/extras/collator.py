@@ -50,21 +50,20 @@ class PPODataCollatorWithPadding(DataCollatorForSeq2Seq):
 class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
 
     def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        concat_features = []
-        for feature in features:
-            concat_features.append({
-                "prompt_input_ids": feature["input_ids"],
-                "chosen_ids": feature["chosen_ids"],
-                "rejected_ids": feature["rejected_ids"]
-            })
 
         batch = self.tokenizer.pad(
-            concat_features,
+            features,
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors=self.return_tensors
         )
+        if "chosen_input_ids" in batch:
+            batch["chosen_labels"] = torch.ones_like(batch["chosen_input_ids"])
+
+        if "rejected_input_ids" in batch:
+            batch["rejected_labels"] = torch.ones_like(batch["rejected_input_ids"])
+
         return batch
 
 

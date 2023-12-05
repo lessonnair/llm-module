@@ -84,7 +84,8 @@ class DataProcessor(object):
         else:
             render = Render(render_name)
             if stage in ["rm", "ppo", "dpo"]:
-                result = {"input_ids": [], "chosen_input_ids": [], "rejected_input_ids": []}
+                result = {"input_ids": [], "chosen_input_ids": [], "rejected_input_ids": [],
+                          "attention_mask": [], "chosen_attention_mask": [], "rejected_attention_mask": []}
                 for query, response, history, system in self.construct_example(examples):
                     source_ids, chosen_ids = render.render_with_history(tokenizer, query, response[0], history=history,
                                                                         system=system, multi_turn=False)
@@ -98,15 +99,17 @@ class DataProcessor(object):
                     source_max_len = int(self.cutoff_len * (len(source_ids) / total_len))
                     target_max_len = int(self.cutoff_len * (max(len(chosen_ids), len(rejected_ids)) / total_len))
 
-                    result["input_ids"].append(
-                        self.do_truncation(source_ids, source_max_len)
-                    )
-                    result["chosen_input_ids"].append(
-                        self.do_truncation(chosen_ids, target_max_len)
-                    )
-                    result["rejected_input_ids"].append(
-                        self.do_truncation(rejected_ids, target_max_len)
-                    )
+                    input_ids = self.do_truncation(source_ids, source_max_len)
+                    chosen_input_ids = self.do_truncation(chosen_ids, target_max_len)
+                    rejected_input_ids = self.do_truncation(rejected_ids, target_max_len)
+
+                    result["input_ids"].append(input_ids)
+                    result["chosen_input_ids"].append(chosen_input_ids)
+                    result["rejected_input_ids"].append(rejected_input_ids)
+                    result["attention_mask"].append([1] * len(input_ids))
+                    result["chosen_attention_mask"].append([1] * len(chosen_input_ids))
+                    result["rejected_attention_mask"].append([1] * len(rejected_input_ids))
+
                 return result
 
             elif stage == "sft":
@@ -134,9 +137,7 @@ class DataProcessor(object):
                     result["attention_mask"] = [1] * len(input_ids)
                     result["labels"] = labels
                     return self.do_block_split(result, self.cutoff_len)
-
                 else:
-
                     for query, response, history, system in self.construct_example(examples):
                         input_ids, labels = [], []
                         for idx, (source_ids, target_ids) in enumerate(render.render_with_history(

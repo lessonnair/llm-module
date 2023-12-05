@@ -80,13 +80,13 @@ class Trainer(Task):
                 mlm=False
             )
         elif self.stage in ("ppo"):
-            data_collator = DPODataCollatorWithPadding(
+            data_collator = PPODataCollatorWithPadding(
                 tokenizer=self.tokenizer,
                 pad_to_multiple_of=4,
                 label_pad_token_id=IGNORE_INDEX if self.ignore_pad_token_for_loss else self.tokenizer.pad_token_id
             )
         elif self.stage in ("dpo"):
-            data_collator = DataCollatorWithPadding(self.tokenizer)
+            data_collator = DPODataCollatorWithPadding(self.tokenizer)
         elif self.stage == "rm":
             data_collator = PairwiseDataCollatorWithPadding(self.tokenizer, pad_to_multiple_of=4)
 
@@ -128,7 +128,6 @@ class Trainer(Task):
             gen_params["pad_token_id"] = self.tokenizer.pad_token_id
 
         elif self.stage in ["dpo"]:
-            from trl import DPOTrainer
             trainer_clazz = DPOTrainer
 
         elif self.stage in ["ppo"]:
