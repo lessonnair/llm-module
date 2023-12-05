@@ -83,8 +83,8 @@ class DataProcessor(object):
             return self.do_block_split(concatenated_examples, self.cutoff_len)
         else:
             render = Render(render_name)
-            if stage in ["rm", "ppo"]:
-                result = {"input_ids": [], "chosen_ids": [], "rejected_ids": []}
+            if stage in ["rm", "ppo", "dpo"]:
+                result = {"input_ids": [], "chosen_input_ids": [], "rejected_input_ids": []}
                 for query, response, history, system in self.construct_example(examples):
                     source_ids, chosen_ids = render.render_with_history(tokenizer, query, response[0], history=history,
                                                                         system=system, multi_turn=False)
@@ -101,10 +101,10 @@ class DataProcessor(object):
                     result["input_ids"].append(
                         self.do_truncation(source_ids, source_max_len)
                     )
-                    result["chosen_ids"].append(
+                    result["chosen_input_ids"].append(
                         self.do_truncation(chosen_ids, target_max_len)
                     )
-                    result["rejected_ids"].append(
+                    result["rejected_input_ids"].append(
                         self.do_truncation(rejected_ids, target_max_len)
                     )
                 return result

@@ -29,6 +29,4 @@ class GenerateArguments(Task):
         self.params = self.get_section_params()
 
     def main_handle(self):
-        self.inst = self.get_inst_clazz()(
-            **self.params
-        )
+        self.inst = self.params

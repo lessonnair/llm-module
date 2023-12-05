@@ -3,10 +3,9 @@
 import torch
 from tqdm import tqdm
 from typing import List
-from modules.util.custom_log import get_logger
 import trl
 from modules.util.checkpoint_util import *
-
+from modules.util.custom_log import get_logger
 
 logger = get_logger(__name__)
 
@@ -20,9 +19,7 @@ class PPOTrainer(trl.PPOTrainer):
 
         self.generation_kwargs = generation_kwargs
 
-
     def train(self, resume_from_checkpoint=None):
-
         for epoch, batch in tqdm(enumerate(self.dataloader)):
             query_tensors = batch["input_ids"]
 
@@ -37,7 +34,6 @@ class PPOTrainer(trl.PPOTrainer):
             # run ppo step
             stats = self.step(query_tensors, response_tensors, rewards)
             self.log_stats(stats, batch, rewards)
-
 
     def get_rewards(self,
                     queries: List[torch.Tensor],
@@ -60,8 +56,6 @@ class PPOTrainer(trl.PPOTrainer):
         replace_model(unwrapped_model, target="default")
         return rewards
 
-
-
-
-
-
+    def save_model(self, output_dir: Optional[str] = None) -> None:
+        if self.args.should_save:
+            self._save(output_dir)

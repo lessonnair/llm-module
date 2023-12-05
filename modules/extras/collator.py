@@ -6,7 +6,7 @@ from transformers import DataCollatorWithPadding
 
 
 @dataclass
-class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
+class PPODataCollatorWithPadding(DataCollatorForSeq2Seq):
 
     def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
 
@@ -44,6 +44,28 @@ class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
             padded_tensor[answer_start_index: answer_end_index] = feature[answer_start_index: answer_end_index]
             padded_labels.append(padded_tensor)
         return torch.stack(padded_labels, dim=0).contiguous()
+
+
+@dataclass
+class DPODataCollatorWithPadding(DataCollatorForSeq2Seq):
+
+    def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        concat_features = []
+        for feature in features:
+            concat_features.append({
+                "prompt_input_ids": feature["input_ids"],
+                "chosen_ids": feature["chosen_ids"],
+                "rejected_ids": feature["rejected_ids"]
+            })
+
+        batch = self.tokenizer.pad(
+            concat_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=self.return_tensors
+        )
+        return batch
 
 
 class PairwiseDataCollatorWithPadding(DataCollatorWithPadding):

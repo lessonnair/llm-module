@@ -79,12 +79,14 @@ class Trainer(Task):
                 tokenizer=self.tokenizer,
                 mlm=False
             )
-        elif self.stage == "ppo":
+        elif self.stage in ("ppo"):
             data_collator = DPODataCollatorWithPadding(
                 tokenizer=self.tokenizer,
                 pad_to_multiple_of=4,
                 label_pad_token_id=IGNORE_INDEX if self.ignore_pad_token_for_loss else self.tokenizer.pad_token_id
             )
+        elif self.stage in ("dpo"):
+            data_collator = DataCollatorWithPadding(self.tokenizer)
         elif self.stage == "rm":
             data_collator = PairwiseDataCollatorWithPadding(self.tokenizer, pad_to_multiple_of=4)
 
@@ -124,6 +126,10 @@ class Trainer(Task):
 
             gen_params["eos_token_id"] = [self.tokenizer.eos_token_id] + self.tokenizer.additional_special_tokens_ids
             gen_params["pad_token_id"] = self.tokenizer.pad_token_id
+
+        elif self.stage in ["dpo"]:
+            from trl import DPOTrainer
+            trainer_clazz = DPOTrainer
 
         elif self.stage in ["ppo"]:
             from trl import PPOConfig
@@ -177,7 +183,6 @@ class Trainer(Task):
                 if trainer.is_world_process_zero() and self.plot_loss:
                     plot_loss(self.args.output_dir, keys=["loss", "reward"])
             else:
-
                 train_result = trainer.train(resume_from_checkpoint=self.resume_from_checkpoint)
                 trainer.log_metrics("train", train_result.metrics)
                 trainer.save_metrics("train", train_result.metrics)
