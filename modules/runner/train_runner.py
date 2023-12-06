@@ -176,7 +176,7 @@ class Trainer(Task):
 
         if "train" in self.steps:
             if self.stage == "ppo":
-                trainer.ppo_train()
+                trainer.train(resume_from_checkpoint=self.resume_from_checkpoint)
                 trainer.save_model()
                 trainer.save_state()  # must be called after save_model to have a folder
                 if trainer.is_world_process_zero() and self.plot_loss:
@@ -205,7 +205,7 @@ class Trainer(Task):
             trainer.log_metrics("eval", metrics)
             trainer.save_metrics("eval", metrics)
 
-        if self.stage != "pt" and "predict" in self.steps:
+        if self.stage not in ["pt", "dpo"] and "predict" in self.steps:
             predictions = trainer.predict(datasets["eval_dataset"], metric_key_prefix="predict", **gen_params)
             if self.predict_with_generate:
                 predictions.metrics.pop("predict_loss", None)

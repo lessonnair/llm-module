@@ -13,23 +13,40 @@ logger = get_logger(__name__)
 class PPOTrainer(trl.PPOTrainer):
 
     def __init__(self,
-                 generation_kwargs: "GeneratingArguments",
+                 model_args: "ModelArguments",
+                 args: "Seq2SeqTrainingArguments",
+                 generating_args: "GeneratingArguments",
+                 callbacks: List["TrainerCallback"],
                  **kwargs):
         trl.PPOTrainer.__init__(self, **kwargs)
 
-        self.generation_kwargs = generation_kwargs
+        self.model_args = model_args
+        self.args = args
+        self.generating_args = generating_args
+        self.log_callback, self.save_callback = callbacks[0], callbacks[1]
 
     def train(self, resume_from_checkpoint=None):
+        unwrapped_model: "AutoModelForCausalLMWithValueHead" = self.accelerator.unwrap_model(self.model)
+
         for epoch, batch in tqdm(enumerate(self.dataloader)):
-            query_tensors = batch["input_ids"]
+            unwrapped_model.gradient_checkpointing_disable()
+            unwrapped_model.config.use_cache = True
+            self.model.eval()
+
+            query_tensors = [query for query in batch["input_ids"]]
 
             response_tensors = []
             for query in query_tensors:
-                response = self.generate(query, **self.generation_kwargs)
+                response = self.generate(query, **self.generating_args)
                 response_tensors.append(response.squeeze())
+
             batch["response"] = [self.tokenizer.decode(r.squeeze()) for r in response_tensors]
 
-            rewards = self.get_rewards(query_tensors, response_tensors)
+            rewards = self.get_rewards(query_tensors, response_tensors, unwrapped_model)
+            unwrapped_model.gradient_checkpointing_enable()
+            unwrapped_model.config.use_cache = False
+
+            self.model.train()
 
             # run ppo step
             stats = self.step(query_tensors, response_tensors, rewards)

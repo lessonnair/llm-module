@@ -12,7 +12,7 @@ class PPODataCollatorWithPadding(DataCollatorForSeq2Seq):
 
         concat_features = []
         label_positions = []
-        for key in ("chosen_ids", "rejected_ids"):
+        for key in ["chosen_input_ids"]:
             for feature in features:
                 prompt_len, answer_len = len(feature["input_ids"]), len(feature[key])
 
