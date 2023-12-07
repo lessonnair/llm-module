@@ -127,7 +127,7 @@ class ModelLoader(Task):
                     setattr(config, "use_logn_attn", True)
                     self.logger.info("using dynamic ntk scaling")
 
-            # for llama and falcon models
+            # for LLaMA and Falcon models
             elif hasattr(config, "rope_scaling"):
                 if self.is_trainable:
                     if self.rope_scaling == "dynamic":
@@ -166,6 +166,7 @@ class ModelLoader(Task):
             LlamaModule.LlamaAttention = llama_patch.LlamaShiftShortAttention
             self.logger.warning("Using `--flash_attn` for faster training in large context length.")
 
+        # set shift short attention
         if self.is_trainable and self.shift_attn:
             if getattr(config, "model_type", None) == "llama":
                 setattr(config, "group_size_ratio", 0.25)
