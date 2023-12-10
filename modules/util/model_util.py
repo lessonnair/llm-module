@@ -1,6 +1,6 @@
 import os
 import torch
-from typing import TYPE_CHECKING, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional
 
 from transformers.trainer import WEIGHTS_NAME
 
@@ -11,6 +11,24 @@ if TYPE_CHECKING:
     from trl import AutoModelForCausalLMWithValueHead
 
 logger = get_logger(__name__)
+
+def find_all_linear_modules(model: "PreTrainedModel",
+                            quantization_bit: Optional[int] = None,
+                            output_layer_name: Optional[str] = "lm_head") -> List[str]:
+    if quantization_bit is not None:
+        import bitsandbytes
+        linear_cls = bitsandbytes.nn.Linear4bit if quantization_bit == 4 else bitsandbytes.nn.Linear8bitLt
+    else:
+        linear_cls = torch.nn.Linear
+    module_names = set()
+    for name, module in model.named_modules():
+        if output_layer_name not in name and isinstance(module, linear_cls):
+            module_names.add(name.split(".")[-1])
+
+    if output_layer_name in module_names:
+        module_names.pop(output_layer_name)
+
+    return list(module_names)
 
 
 def load_valuehead_params(model: torch.nn.Module, checkpoint_dir: os.PathLike) -> bool:

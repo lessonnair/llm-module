@@ -10,9 +10,10 @@ from types import MethodType
 from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase, PreTrainedModel
 from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
-from modules.util.checkpoint_util import *
+from modules.util.model_util import *
 from modules.util.analyze_util import *
 from modules.util.util import *
+from modules.extras.model import *
 
 try:
     from transformers.integrations import is_deepspeed_zero3_enabled
@@ -62,9 +63,11 @@ class ModelLoader(Task):
 
         self.model_path = self.get_config("pretrained_model_name_or_path")
         self.print_model_structure = self.get_config("print_model_structure")
+        
+        self.finetune_arguments = self.get_instance("finetune_arguments")
 
         params = self.get_section_params()
-        for c in ("pretrained_model_name_or_path", "print_model_structure"):
+        for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_arguments"):
             params.pop(c)
 
         config_kwargs = {}
@@ -82,27 +85,13 @@ class ModelLoader(Task):
         self.double_quantization = self.pop_dict(params, "double_quantization", None)
         self.quantization_type = self.pop_dict(params, "quantization_type", None)
         self.reward_model = self.pop_dict(params, "reward_model")
-        self.config_checkpoint_dir = self.pop_dict(params, "config_checkpoint_dir")
-
-        self.type = self.pop_dict(params, "type")
-        self.lora_config = self.load_lora_config(params)
+        self.checkpoint_dir = self.pop_dict(params, "checkpoint_dir")
 
         self.config_kwargs = config_kwargs
         self.params = params
 
         if len(self.proxies) > 0:
             self.config_kwargs["proxies"] = self.proxies
-
-    def load_lora_config(self, params):
-        lora_params = {}
-        for k in list(params.keys()):
-            if k.startswith("lora_config"):
-                v = self.pop_dict(params, k)
-                k = k.split("lora_config_")[1]
-                if k == "target_modules":
-                    v = [i.strip() for i in v.split(",")]
-                lora_params[k] = v
-        return peft.LoraConfig(**lora_params)
 
     def main_handle(self):
 
@@ -217,16 +206,17 @@ class ModelLoader(Task):
         if isinstance(model, PreTrainedModel) and "AutoModelForCausalLM" in getattr(config, "auto_map", {}):
             model.__class__.register_for_auto_class()
 
-        if self.type == "lora":
-            if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
-                for config_dir in self.config_checkpoint_dir:
-                    model = peft.PeftModel.from_pretrained(model, config_dir)
-                    model = model.merge_and_unload()
-                self.logger.info("Loaded {} model checkpoint(s).".format(len(self.config_checkpoint_dir)))
-            else:
-                model = peft.get_peft_model(model, self.lora_config)
-                if id(model.peft_config) != id(model.base_model.peft_config):
-                    model.base_model.peft_config = model.peft_config
+        if self.is_trainable:
+            model = prepare_model_for_train(model=model,
+                                            finetuning_args=self.finetune_arguments)
+
+        model = init_adapter(model,
+                             self.finetune_arguments,
+                             self.is_trainable,
+                             is_mergeable,
+                             quantization_bit=self.quantization_bit,
+                             checkpoint_dir=self.quantization_bit,
+                             )
 
         if self.is_trainable:
             model = model.train()
@@ -275,38 +265,3 @@ class ModelLoader(Task):
         if self.print_model_structure:
             self.logger.info("model", self.inst)
 
-
-class AdapterLoader(Task):
-
-    def __init__(self, config):
-        super(AdapterLoader, self).__init__(config)
-
-        self.model = self.get_instance("model")
-        self.config_checkpoint_dir = self.get_config_list("config_checkpoint_dir")
-
-        self.lora_config = self.load_lora_config()
-
-    def main_handle(self):
-        if self.config_checkpoint_dir is not None and len(self.config_checkpoint_dir) > 0:
-            for config_dir in self.config_checkpoint_dir:
-                model = peft.PeftModel.from_pretrained(self.model, config_dir)
-                model = model.merge_and_unload()
-            self.logger.info("Loaded {} model checkpoint(s).".format(len(self.config_checkpoint_dir)))
-        else:
-            model = peft.get_peft_model(self.model, self.lora_config)
-            if id(model.peft_config) != id(model.base_model.peft_config):
-                model.base_model.peft_config = model.peft_config
-
-        self.inst = model
-
-    def load_lora_config(self):
-        params = self.get_section_params()
-        lora_params = {}
-        for k in params:
-            if k.startswith("lora_config"):
-                v = params[k]
-                k = k.split("lora_config_")[1]
-                if k == "target_modules":
-                    v = [i.strip() for i in v.split(",")]
-                lora_params[k] = v
-        return peft.LoraConfig(**lora_params)

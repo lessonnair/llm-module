@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 from typing import List, Optional
 import trl
-from modules.util.checkpoint_util import *
+from modules.util.model_util import *
 from modules.util.custom_log import get_logger
 
 logger = get_logger(__name__)

@@ -8,7 +8,7 @@ from trl.core import PPODecorators, logprobs_from_logits
 from modules.util.custom_log import get_logger
 from modules.util.analyze_util import count_parameters
 from modules.util.metric_util import AverageMeter, get_logits_processor
-from modules.util.checkpoint_util import *
+from modules.util.model_util import *
 
 logger = get_logger(__name__)
 

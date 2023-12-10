@@ -11,6 +11,7 @@ from peft import (
 )
 from modules.util.constants import LAYERNORM_NAMES
 from modules.util.custom_log import get_logger
+from modules.util.model_util import find_all_linear_modules
 
 logger = get_logger(__name__)
 
@@ -54,7 +55,7 @@ def prepare_model_for_train(
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
-    if finetuning_args.finetuning_type != "full" and hasattr(model, output_layer_name):
+    if finetuning_args.type != "full" and hasattr(model, output_layer_name):
         output_layer: torch.nn.Linear = getattr(model, output_layer_name)
         input_dtype = output_layer.weight.dtype
 
@@ -68,18 +69,20 @@ def prepare_model_for_train(
 
 def init_adapter(
     model: "PreTrainedModel",
-    model_args: "ModelArguments",
     finetuning_args: "FinetuningArguments",
     is_trainable: bool,
-    is_mergeable: bool) -> "PreTrainedModel":
-    if finetuning_args.finetuning_type == "none" and is_trainable:
+    is_mergeable: bool,
+    quantization_bit=None,
+    checkpoint_dir=None,
+    ) -> "PreTrainedModel":
+    if finetuning_args.type == "none" and is_trainable:
         raise ValueError("You cannot use finetuning_type=none while training.")
 
-    if finetuning_args.finetuning_type == "full" and is_trainable:
+    if finetuning_args.type == "full" and is_trainable:
         logger.info("Fine-tuning method: Full")
         model = model.float()
 
-    if finetuning_args.finetuning_type == "freeze":
+    if finetuning_args.type == "freeze":
         logger.info("Fine-tuning method: Freeze")
         num_layers = getattr(model.config, "num_layers")
         if finetuning_args.num_layer_trainable > 0:  # fine-tuning the last n layers if num_layer_trainable > 0
@@ -94,15 +97,15 @@ def init_adapter(
             else:
                 param.data = param.data.to(torch.float32)
 
-    if finetuning_args.finetuning_type == "lora":
+    if finetuning_args.type == "lora":
         logger.info("Fine-tuning method: LoRA")
         latest_checkpoint = None
 
-        if model_args.checkpoint_dir is not None:
+        if checkpoint_dir is not None:
             if (is_trainable and finetuning_args.resume_lora_training) or (not is_mergeable):  # continually fine-tuning
-                checkpoints_to_merge, latest_checkpoint = model_args.checkpoint_dir[:-1], model_args.checkpoint_dir[-1]
+                checkpoints_to_merge, latest_checkpoint = checkpoint_dir[:-1], checkpoint_dir[-1]
             else:
-                checkpoints_to_merge = model_args.checkpoint_dir
+                checkpoints_to_merge = checkpoint_dir
 
             for checkpoint in checkpoints_to_merge:
                 model = PeftModel.from_pretrained(model, checkpoint)
@@ -115,26 +118,13 @@ def init_adapter(
                 model = PeftModel.from_pretrained(model, latest_checkpoint, is_trainable=is_trainable)
 
         if is_trainable and latest_checkpoint is None:  # create new lora weights while training
-            if len(finetuning_args.lora_target) == 1 and finetuning_args.lora_target[0] == "all":
-                target_modules = find_all_linear_modules(model, model_args.quantization_bit)
-            else:
-                target_modules = finetuning_args.lora_target
 
-            lora_config = LoraConfig(
-                task_type=TaskType.CAUSAL_LM,
-                inference_mode=False,
-                r=finetuning_args.lora_rank,
-                lora_alpha=finetuning_args.lora_alpha,
-                lora_dropout=finetuning_args.lora_dropout,
-                target_modules=target_modules,
-                modules_to_save=finetuning_args.additional_target
-            )
-            model = get_peft_model(model, lora_config)
+            model = get_peft_model(model, finetuning_args.lora_config)
             if id(model.peft_config) != id(
                     model.base_model.peft_config):  # https://github.com/huggingface/peft/issues/923
                 model.base_model.peft_config = model.peft_config
 
-    if model_args.checkpoint_dir is not None:
-        logger.info("Loaded fine-tuned model from checkpoint(s): {}".format(",".join(model_args.checkpoint_dir)))
+    if checkpoint_dir is not None:
+        logger.info("Loaded fine-tuned model from checkpoint(s): {}".format(",".join(checkpoint_dir)))
 
     return model
