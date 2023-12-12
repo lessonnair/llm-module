@@ -3,15 +3,10 @@
 from .basic_runner import Task
 import math
 from transformers import AutoConfig, AutoTokenizer, PretrainedConfig
-import os
-import peft
-import torch
-from types import MethodType
 from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase, PreTrainedModel
 from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
 from modules.util.model_util import *
-from modules.util.analyze_util import *
 from modules.util.util import *
 from modules.extras.model import *
 
@@ -41,8 +36,8 @@ class TokenizerLoader(Task):
             **self.params
         )
 
-        if getattr(tokenizer, "pad_token", None) is None:
-            tokenizer.pad_token = tokenizer.eos_token
+        # if getattr(tokenizer, "pad_token", None) is None:
+        #     tokenizer.pad_token = tokenizer.eos_token
 
         if getattr(config, "model_type", None) == "chatglm":
             tokenizer._pad = MethodType(PreTrainedTokenizerBase._pad, tokenizer)
@@ -68,14 +63,14 @@ class ModelLoader(Task):
 
         params = self.get_section_params()
         for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_arguments"):
-            params.pop(c)
+            if c in params:
+                params.pop(c)
 
         config_kwargs = {}
         for c in ("trust_remote_code", "cache_dir", "revision", "use_auth_token"):
             if c in params:
                 config_kwargs[c] = params.pop(c)
 
-        self.is_trainable = self.pop_dict(params, "is_trainable")
         self.rope_scaling = self.pop_dict(params, "rope_scaling")
         self.model_max_length = self.pop_dict(params, "model_max_length")
 
@@ -84,7 +79,6 @@ class ModelLoader(Task):
         self.quantization_bit = self.pop_dict(params, "quantization_bit")
         self.double_quantization = self.pop_dict(params, "double_quantization", None)
         self.quantization_type = self.pop_dict(params, "quantization_type", None)
-        self.reward_model = self.pop_dict(params, "reward_model")
         self.checkpoint_dir = self.pop_dict(params, "checkpoint_dir")
 
         self.config_kwargs = config_kwargs
@@ -92,6 +86,11 @@ class ModelLoader(Task):
 
         if len(self.proxies) > 0:
             self.config_kwargs["proxies"] = self.proxies
+
+        self.is_trainable = False
+
+    def set_trainable(self, is_trainable):
+        self.is_trainable = is_trainable
 
     def main_handle(self):
 
@@ -209,59 +208,27 @@ class ModelLoader(Task):
         if self.is_trainable:
             model = prepare_model_for_train(model=model,
                                             finetuning_args=self.finetune_arguments)
-
-        model = init_adapter(model,
-                             self.finetune_arguments,
-                             self.is_trainable,
-                             is_mergeable,
-                             quantization_bit=self.quantization_bit,
-                             checkpoint_dir=self.quantization_bit,
-                             )
+        if self.finetune_arguments is not None:
+            model = init_adapter(model,
+                                 self.finetune_arguments,
+                                 self.is_trainable,
+                                 is_mergeable,
+                                 quantization_bit=self.quantization_bit,
+                                 checkpoint_dir=self.checkpoint_dir,
+                                 )
 
         if self.is_trainable:
             model = model.train()
         else:
             model = model.eval()
 
-        if self.stage in ("rm", "ppo"):
-            from trl import AutoModelForCausalLMWithValueHead
-            require_version("trl>=0.7.1", "To fix: pip install trl>=0.7.1")
-            model = AutoModelForCausalLMWithValueHead.from_pretrained(model)
-            model._keys_to_ignore_on_save = None
-
-            # load valuehead weights to evaluate reward model
-            if self.stage == "rm" and self.checkpoint_dir is not None:
-                self.logger.warning("Only the last checkpoint containing valuehead will be loaded.")
-                if load_valuehead_params(model, self.checkpoint_dir):
-                    model.v_head.load_state_dict({
-                        "summary.weight": getattr(model, "reward_head_weight"),
-                        "summary.bias": getattr(model, "reward_head_bias")
-                    })
-            # load reward model
-            if self.stage == "ppo":
-                if getattr(model, "is_peft_model", False):
-                    model.pretrained_model.load_adapter(self.reward_model, "reward")
-                assert load_valuehead_params(model, self.reward_model), "Reward model is not correctly loaded."
-
-
         # Prepare model for inference
         if not self.is_trainable:
             model.requires_grad_(False)
-            if self.quantization_bit is None:
-                model = model.to(self.compute_dtype)
-
-        trainable_params, all_param = count_parameters(model)
-
-        self.logger.info("trainable params: {:d} || all params: {:d} || trainable%: {:.4f}".format(
-            trainable_params, all_param, 100 * trainable_params / all_param
-        ))
-
-        if not self.is_trainable:
-            self.logger.info(
-                "This IS expected that the trainable params is 0 if you are using model for inference only.")
+            # if self.quantization_bit is None:
+            #     model = model.to(self.compute_dtype)
 
         self.inst = model
 
         if self.print_model_structure:
             self.logger.info("model", self.inst)
-

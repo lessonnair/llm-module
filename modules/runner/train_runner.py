@@ -5,10 +5,13 @@ from modules.util.package_util import import_package
 import math
 import transformers
 from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling, DataCollatorWithPadding
+from transformers.utils.versions import require_version
 from modules.util.ploting import plot_loss
 from modules.util.constants import *
+from modules.runner import ModelLoader
 from modules.extras.collator import *
 from modules.core.trainer import *
+from modules.util.analyze_util import *
 from modules.util.metric_util import *
 from modules.util.util import *
 from modules.extras.callbacks import *
@@ -21,11 +24,11 @@ class Trainer(Task):
     def __init__(self, config, name=None):
         super(Trainer, self).__init__(config, name=name)
 
-        self.model = self.get_instance("model")
         self.tokenizer = self.get_instance("tokenizer")
         self.args = self.get_instance("args")
         self.ppo_args = self.get_instance("ppo_args")
         self.generate_args = self.get_instance("generate_args")
+        self.finetune_args = self.get_instance("finetune_args")
         self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
@@ -42,6 +45,10 @@ class Trainer(Task):
         self.args.predict_with_generate = self.predict_with_generate
 
         self.data_collator = self.init_data_collator()
+
+        self.stage = self.finetune_args.stage
+
+        self.model = self.init_model()
 
     def split_dataset(self, dataset):
         res = {}
@@ -92,7 +99,45 @@ class Trainer(Task):
 
         return data_collator
 
+    def init_model(self, config):
+        model_loader = ModelLoader(config)
+        model_loader.set_trainable(True)
+        model_loader.main_handle()
+
+        model = model_loader.inst
+
+        if self.stage in ("rm", "ppo"):
+            from trl import AutoModelForCausalLMWithValueHead
+            require_version("trl>=0.7.1", "To fix: pip install trl>=0.7.1")
+            model = AutoModelForCausalLMWithValueHead.from_pretrained(model)
+            model._keys_to_ignore_on_save = None
+
+            # load valuehead weights to evaluate reward model
+            if self.stage == "rm" and self.checkpoint_dir is not None:
+                self.logger.warning("Only the last checkpoint containing valuehead will be loaded.")
+                if load_valuehead_params(model, self.finetune_args.checkpoint_dir):
+                    model.v_head.load_state_dict({
+                        "summary.weight": getattr(model, "reward_head_weight"),
+                        "summary.bias": getattr(model, "reward_head_bias")
+                    })
+            # load reward model
+            if self.stage == "ppo":
+                if getattr(model, "is_peft_model", False):
+                    model.pretrained_model.load_adapter(self.finetune_args.reward_model, "reward")
+                assert load_valuehead_params(model, self.finetune_args.reward_model), "Reward model is not correctly loaded."
+
+        trainable_params, all_param = count_parameters(model)
+
+        self.logger.info("trainable params: {:d} || all params: {:d} || trainable%: {:.4f}".format(
+            trainable_params, all_param, 100 * trainable_params / all_param
+        ))
+
+        return model
+
+
     def main_handle(self):
+
+        self._prepare_model()
 
         if self.stage != "ppo":
             datasets = self.split_dataset(self.get_instance("dataset"))

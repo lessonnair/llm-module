@@ -108,12 +108,11 @@ class RenderConfig(object):
                 res = json.loads(v)
             except Exception as e:
                 logger.warning(e)
-                res = None
         return res
 
     def get_section_kvs(self, section_name,
                         empty_to_none=False,
-                        parse_json=False):
+                        parse_json=True):
         kvs = self.config.items(section_name)
         kvs = {k: self.parse_value(v, empty_to_none=empty_to_none, parse_json=parse_json) for k, v in kvs}
         return kvs

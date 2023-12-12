@@ -27,12 +27,12 @@ def prepare_model_for_train(
     layernorm_names: Optional[List[str]] = LAYERNORM_NAMES
 ) -> "PreTrainedModel":
 
-    if finetuning_args.upcast_layernorm:
+    if finetuning_args is not None and finetuning_args.upcast_layernorm:
         for name, param in model.named_parameters():
             if param.ndim == 1 and any(ln_name in name for ln_name in layernorm_names):
                 param.data = param.data.to(torch.float32)
 
-    if finetuning_args.neft_alpha > 1e-6:
+    if finetuning_args is not None and finetuning_args.neft_alpha > 1e-6:
         input_embed: torch.nn.Embedding = model.get_input_embeddings()
 
         def noisy_forward(self: torch.nn.Embedding, x: torch.Tensor) -> torch.Tensor:
@@ -55,7 +55,7 @@ def prepare_model_for_train(
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
-    if finetuning_args.type != "full" and hasattr(model, output_layer_name):
+    if finetuning_args is not None and finetuning_args.type != "full" and hasattr(model, output_layer_name):
         output_layer: torch.nn.Linear = getattr(model, output_layer_name)
         input_dtype = output_layer.weight.dtype
 

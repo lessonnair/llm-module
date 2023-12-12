@@ -58,8 +58,8 @@ class ChatModel:
              system: Optional[str] = None,
              **input_kwargs
              ) -> Tuple[str, Tuple[int, int]]:
-        kwargs, prompt_length = self.get_prompt_length(query, history, system, **input_kwargs)
-        generation_output = self.model.generate(**self.kwargs)
+        kwargs, prompt_length = self.preprocess(query, history, system, **input_kwargs)
+        generation_output = self.model.generate(**kwargs)
         outputs = generation_output.tolist()[0][prompt_length:]
         response = self.tokenizer.decode(outputs, skip_special_tokens=True)
         response_length = len(outputs)

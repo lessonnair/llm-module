@@ -51,11 +51,13 @@ class Task(object):
 
     def get_instance(self, key):
         key = self.get_config(key)
+        if key is None or len(key) <= 0:
+            return None
         inst = self.instance_pool.get(key)
         if inst is not None:
             return inst
         else:
-            if re.match("(^DatasetLoader_[0-9]+$)|(^Trainer_[0-9]+$)|(^TrainingArguments_[0-9]+$)", key):
+            if re.match("^\\w+_[0-9]+$", key):
                 class_name = key.split("_")[0]
                 task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key)
             else:

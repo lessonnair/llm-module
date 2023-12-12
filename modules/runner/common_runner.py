@@ -86,10 +86,11 @@ class Chat(Task):
 
             print("Assistant: ", end="", flush=True)
 
-            response = ""
-            for new_text in chat_model.stream_chat(query, history):
-                print(new_text, end="", flush=True)
-                response += new_text
+            response = chat_model.chat(query, history)
+            print(response)
+            # for new_text in chat_model.chat(query, history):
+            #     print(new_text, end="", flush=True)
+            #     response += new_text
 
             history = history + [(query, response)]
 
