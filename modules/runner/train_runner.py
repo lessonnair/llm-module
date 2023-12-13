@@ -8,7 +8,7 @@ from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling
 from transformers.utils.versions import require_version
 from modules.util.ploting import plot_loss
 from modules.util.constants import *
-from modules.runner import ModelLoader
+from modules.runner import ModelLoader, DatasetLoader
 from modules.extras.collator import *
 from modules.core.trainer import *
 from modules.util.analyze_util import *
@@ -29,6 +29,7 @@ class Trainer(Task):
         self.ppo_args = self.get_instance("ppo_args")
         self.generate_args = self.get_instance("generate_args")
         self.finetune_args = self.get_instance("finetune_args")
+        self.stage = self.finetune_args.stage
         self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
@@ -45,8 +46,6 @@ class Trainer(Task):
         self.args.predict_with_generate = self.predict_with_generate
 
         self.data_collator = self.init_data_collator()
-
-        self.stage = self.finetune_args.stage
 
         self.model = self.init_model()
 
@@ -99,8 +98,8 @@ class Trainer(Task):
 
         return data_collator
 
-    def init_model(self, config):
-        model_loader = ModelLoader(config)
+    def init_model(self):
+        model_loader = ModelLoader(self.config)
         model_loader.set_trainable(True)
         model_loader.main_handle()
 
@@ -137,12 +136,12 @@ class Trainer(Task):
 
     def main_handle(self):
 
-        self._prepare_model()
+        dataset = self.new_instance("dataset", stage=self.stage)
 
         if self.stage != "ppo":
-            datasets = self.split_dataset(self.get_instance("dataset"))
+            datasets = self.split_dataset(dataset)
         else:
-            datasets = {"dataset": self.get_instance("dataset")}
+            datasets = {"dataset": dataset}
 
         self.model.train()
         if len(self.stage) == 1:

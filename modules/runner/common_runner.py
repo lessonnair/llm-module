@@ -30,14 +30,21 @@ class Chat(Task):
     def __init__(self, config, name=None):
         super(Chat, self).__init__(config, name=name)
 
-
-        self.model = self.get_instance("model")
         self.generating_args = self.get_instance("generating_args")
 
         render = self.get_config("render")
         self.render = Render(render)
 
         self.tokenizer = self._get_tokenizer()
+        self.model = self._get_model()
+
+    def _get_model(self):
+        model = self.get_instance("model")
+        model.eval()
+        model.requires_grad_(False)
+
+        return model
+
 
     def _get_tokenizer(self):
         tokenizer = self.get_instance("tokenizer")
@@ -86,11 +93,12 @@ class Chat(Task):
 
             print("Assistant: ", end="", flush=True)
 
-            response = chat_model.chat(query, history)
-            print(response)
-            # for new_text in chat_model.chat(query, history):
-            #     print(new_text, end="", flush=True)
-            #     response += new_text
+            # response = chat_model.chat(query, history)[0]
+            # print(response)
+            response = ''
+            for new_text in chat_model.stream_chat(query, history):
+                print(new_text, end="", flush=True)
+                response += new_text
 
             history = history + [(query, response)]
 

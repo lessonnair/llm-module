@@ -46,7 +46,7 @@ class ChatModel:
         input_ids = torch.tensor([prompt], device=device)
         kwargs = dict(
             inputs=input_ids,
-            generation_config=GenerationConfig(**self.generating_args),
+            # generation_config=GenerationConfig(**self.generating_args),
             logits_processor=get_logits_processor()
         )
         prompt_length = len(input_ids[0])

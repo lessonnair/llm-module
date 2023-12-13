@@ -7,10 +7,12 @@ from modules.core.etl.process import DataProcessor
 
 class DatasetLoader(Task):
 
-    def __init__(self, config, name=None):
+    def __init__(self, config, name=None, stage=None):
         super(DatasetLoader, self).__init__(config, name=name)
 
         params = self.get_section_params()
+
+        self.stage = stage
 
         self.path = self.pop_dict(params, "path")
         self.data_files = self.get_config_list("data_files")

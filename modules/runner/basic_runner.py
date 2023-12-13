@@ -23,7 +23,6 @@ class Task(object):
         self.logger = Logger(self.name)
 
         self.proxies = self.load_proxies()
-        self.stage = self.config.get("Project", "stage", fallback=None)
         self.checkpoint_dir = self.config.get("Project", "checkpoint_dir", fallback=None)
 
     def load_proxies(self):
@@ -65,6 +64,20 @@ class Task(object):
             task_inst.run()
 
             return task_inst.inst
+
+    def new_instance(self, key, **kwargs):
+        key = self.get_config(key)
+        if key is None or len(key) <= 0:
+            return None
+
+        if re.match("^\\w+_[0-9]+$", key):
+            class_name = key.split("_")[0]
+            task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
+        else:
+            task_inst = getattr(sys.modules["modules.runner"], key)(self.config, **kwargs)
+        task_inst.run()
+
+        return task_inst.inst
 
     def pop_dict(self, params, k, default=None):
         res = default
