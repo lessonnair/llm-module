@@ -18,10 +18,12 @@ except ImportError:  # https://github.com/huggingface/transformers/releases/tag/
 
 class TokenizerLoader(Task):
 
-    def __init__(self, config, name=None):
+    def __init__(self, config, name=None, model_path=None):
         super(TokenizerLoader, self).__init__(config, name=name)
-
-        self.model_path = self.get_config("pretrained_model_name_or_path")
+        if model_path is None:
+            self.model_path = self.get_config("pretrained_model_name_or_path")
+        else:
+            self.model_path = model_path
         params = self.get_section_params()
         params.pop("pretrained_model_name_or_path")
         self.params = params
@@ -35,6 +37,9 @@ class TokenizerLoader(Task):
             self.model_path,
             **self.params
         )
+
+        if getattr(tokenizer, "eos_token", None) is None:
+            tokenizer.eos_token = tokenizer.cls_token
 
         if getattr(tokenizer, "pad_token", None) is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -53,10 +58,13 @@ class TokenizerLoader(Task):
 
 class ModelLoader(Task):
 
-    def __init__(self, config):
+    def __init__(self, config, model_path=None):
         super(ModelLoader, self).__init__(config)
 
-        self.model_path = self.get_config("pretrained_model_name_or_path")
+        if model_path is None:
+            self.model_path = self.get_config("pretrained_model_name_or_path")
+        else:
+            self.model_path = model_path
         self.print_model_structure = self.get_config("print_model_structure")
         
         self.finetune_arguments = self.get_instance("finetune_arguments")
@@ -88,6 +96,9 @@ class ModelLoader(Task):
             self.config_kwargs["proxies"] = self.proxies
 
         self.is_trainable = False
+
+    def set_model_path(self, model_path):
+        self.model_path = model_path
 
     def set_trainable(self, is_trainable):
         self.is_trainable = is_trainable

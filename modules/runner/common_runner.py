@@ -16,8 +16,9 @@ class Export(Task):
         tokenizer = self.get_instance("TokenizerLoader")
 
         model.config.use_cache = True
-        tokenizer.padding_side = "left"
-        tokenizer.init_kwargs["padding_side"] = "left"
+        if hasattr(tokenizer, "padding_side"):
+            tokenizer.padding_side = "left"
+            tokenizer.init_kwargs["padding_side"] = "left"
         model.save_pretrained(self.output_dir, max_shard_size=self.max_shard_size)
         try:
             tokenizer.save_pretrained(self.output_dir)
@@ -35,11 +36,17 @@ class Chat(Task):
         render = self.get_config("render")
         self.render = Render(render)
 
+        self.model_path = self.get_config("pretrained_model_name_or_path")
+
         self.tokenizer = self._get_tokenizer()
         self.model = self._get_model()
 
+
     def _get_model(self):
-        model = self.get_instance("model")
+        if self.model_path is not None and len(self.model_path) > 0:
+            model = self.new_instance("model", model_path=self.model_path)
+        else:
+            model = self.get_instance("model")
         model.eval()
         model.requires_grad_(False)
 
@@ -47,7 +54,11 @@ class Chat(Task):
 
 
     def _get_tokenizer(self):
+        # if self.model_path is not None and len(self.model_path) > 0:
+        #     tokenizer = self.new_instance("tokenizer", model_path=self.model_path)
+        # else:
         tokenizer = self.get_instance("tokenizer")
+
         tokenizer.padding_side = "left"
         if tokenizer.eos_token_id is None:
             tokenizer.eos_token = "<|endoftext|>"
