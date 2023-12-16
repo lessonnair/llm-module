@@ -95,17 +95,12 @@ class ModelLoader(Task):
             self.config_kwargs["proxies"] = self.proxies
 
         self.is_trainable = False
-        self.finetune_args = None
 
     def set_model_path(self, model_path):
         self.model_path = model_path
 
     def set_trainable(self, is_trainable):
         self.is_trainable = is_trainable
-
-
-    def set_finetune_args(self, finetune_args):
-        self.finetune_args = finetune_args
 
     def main_handle(self):
 
