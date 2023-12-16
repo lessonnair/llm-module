@@ -64,8 +64,10 @@ class ModelLoader(Task):
             self.model_path = model_path
         self.print_model_structure = self.get_config("print_model_structure")
 
+        self.finetune_args = self.get_config("finetune_args")
+
         params = self.get_section_params()
-        for c in ("pretrained_model_name_or_path", "print_model_structure"):
+        for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_args"):
             if c in params:
                 params.pop(c)
 

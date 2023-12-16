@@ -28,8 +28,7 @@ class Trainer(Task):
         self.args = self.get_instance("args")
         self.ppo_args = self.get_instance("ppo_args")
         self.generate_args = self.get_instance("generate_args")
-        self.finetune_args = self.get_instance("finetune_args")
-        self.stage = self.finetune_args.stage
+        self.stage = self.get_config("stage")
         self.steps = self.get_config_list("steps")
         self.resume_from_checkpoint = self.get_config("resume_from_checkpoint")
         self.plot_loss = self.get_config("plot_loss")
@@ -101,7 +100,6 @@ class Trainer(Task):
     def init_model(self):
         model_loader = ModelLoader(self.config)
         model_loader.set_trainable(True)
-        model_loader.set_finetune_args(self.finetune_args)
         model_loader.main_handle()
 
         model = model_loader.inst
@@ -116,16 +114,18 @@ class Trainer(Task):
             # load valuehead weights to evaluate reward model
             if self.stage == "rm" and self.checkpoint_dir is not None:
                 self.logger.warning("Only the last checkpoint containing valuehead will be loaded.")
-                if load_valuehead_params(model, self.finetune_args.checkpoint_dir):
+                if load_valuehead_params(model, self.checkpoint_dir):
                     model.v_head.load_state_dict({
                         "summary.weight": getattr(model, "reward_head_weight"),
                         "summary.bias": getattr(model, "reward_head_bias")
                     })
             # load reward model
             if self.stage == "ppo":
+                reward_model = self.get_config("reward_model")
+                assert reward_model is not None and len(reward_model) > 0, "reward_model must be set since stage is ppo"
                 if getattr(model, "is_peft_model", False):
-                    model.pretrained_model.load_adapter(self.finetune_args.reward_model, "reward")
-                assert load_valuehead_params(model, self.finetune_args.reward_model), "Reward model is not correctly loaded."
+                    model.pretrained_model.load_adapter(reward_model, "reward")
+                assert load_valuehead_params(model, reward_model), "Reward model is not correctly loaded."
 
         trainable_params, all_param = count_parameters(model)
 
