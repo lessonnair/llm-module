@@ -66,10 +66,13 @@ class ModelLoader(Task):
 
         self.finetune_args = self.get_instance("finetune_args")
 
+
         params = self.get_section_params()
         for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_args"):
             if c in params:
                 params.pop(c)
+
+        self.use_gradient_checkpointing = self.pop_dict(params, "use_gradient_checkpointing", True)
 
         config_kwargs = {}
         for c in ("trust_remote_code", "cache_dir", "revision", "use_auth_token"):
@@ -85,8 +88,6 @@ class ModelLoader(Task):
         self.double_quantization = self.pop_dict(params, "double_quantization", None)
         self.quantization_type = self.pop_dict(params, "quantization_type", None)
         self.checkpoint_dir = self.pop_dict(params, "checkpoint_dir")
-
-        self.use_gradient_checkpointing = self.pop_dict(params, "use_gradient_checkpointing", True)
 
         self.config_kwargs = config_kwargs
         self.params = params
