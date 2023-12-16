@@ -21,7 +21,7 @@ class Render(object):
         self.efficient_eos = config.get("efficient_eos")
         self.use_history = config.get("use_history", True)
 
-    def xijin_get_special_ids(self,
+    def _get_special_ids(self,
                          tokenizer: "PreTrainedTokenizer"
                          ) -> Tuple[List[int], List[int]]:
         if tokenizer.bos_token_id is not None and getattr(tokenizer, "add_bos_token", True):
