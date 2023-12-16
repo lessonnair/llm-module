@@ -48,7 +48,7 @@ class Task(object):
             params.pop("class")
         return params
 
-    def get_instance(self, key):
+    def get_instance(self, key, **kwargs):
         key = self.get_config(key)
         if key is None or len(key) <= 0:
             return None
@@ -58,9 +58,9 @@ class Task(object):
         else:
             if re.match("^\\w+_[0-9]+$", key):
                 class_name = key.split("_")[0]
-                task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key)
+                task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
             else:
-                task_inst = getattr(sys.modules["modules.runner"], key)(self.config)
+                task_inst = getattr(sys.modules["modules.runner"], key)(self.config, **kwargs)
             task_inst.run()
 
             return task_inst.inst
@@ -78,6 +78,20 @@ class Task(object):
         task_inst.run()
 
         return task_inst.inst
+
+
+    def new_instance_task(self, key, **kwargs):
+        key = self.get_config(key)
+        if key is None or len(key) <= 0:
+            return None
+
+        if re.match("^\\w+_[0-9]+$", key):
+            class_name = key.split("_")[0]
+            task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
+        else:
+            task_inst = getattr(sys.modules["modules.runner"], key)(self.config, **kwargs)
+
+        return task_inst
 
     def pop_dict(self, params, k, default=None):
         res = default

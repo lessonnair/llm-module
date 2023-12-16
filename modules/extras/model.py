@@ -73,8 +73,8 @@ def init_adapter(
     is_trainable: bool,
     is_mergeable: bool,
     quantization_bit=None,
-    checkpoint_dir=None,
     ) -> "PreTrainedModel":
+    checkpoint_dir = finetuning_args.checkpoint_dir
     if finetuning_args.type == "none" and is_trainable:
         raise ValueError("You cannot use finetuning_type=none while training.")
 

@@ -21,6 +21,7 @@ class FinetuneArguments(Task):
 
         self.lora_config = self.load_lora_config(params)
         self.__dict__.update(params)
+        self.checkpoint_dir = self.get_config_list("checkpoint_dir")
 
     def __getattr__(self, attr):
         return None

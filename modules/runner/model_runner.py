@@ -38,6 +38,9 @@ class TokenizerLoader(Task):
             **self.params
         )
 
+        if getattr(tokenizer, "eos_token", None) is None:
+            tokenizer.eos_token = tokenizer.cls_token
+
         if getattr(tokenizer, "pad_token", None) is None:
             tokenizer.pad_token = tokenizer.eos_token
 
@@ -55,17 +58,22 @@ class TokenizerLoader(Task):
 
 class ModelLoader(Task):
 
-    def __init__(self, config, model_path=None):
+    def __init__(self,
+                 config,
+                 model_path=None,
+                 is_trainable=False,
+                 ):
+
         super(ModelLoader, self).__init__(config)
 
         if model_path is None:
             self.model_path = self.get_config("pretrained_model_name_or_path")
         else:
             self.model_path = model_path
+        self.is_trainable = is_trainable
         self.print_model_structure = self.get_config("print_model_structure")
 
         self.finetune_args = self.get_instance("finetune_args")
-
 
         params = self.get_section_params()
         for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_args"):
@@ -94,8 +102,6 @@ class ModelLoader(Task):
 
         if len(self.proxies) > 0:
             self.config_kwargs["proxies"] = self.proxies
-
-        self.is_trainable = False
 
     def set_model_path(self, model_path):
         self.model_path = model_path
@@ -226,7 +232,6 @@ class ModelLoader(Task):
                                  self.is_trainable,
                                  is_mergeable,
                                  quantization_bit=self.quantization_bit,
-                                 checkpoint_dir=self.checkpoint_dir,
                                  )
 
         if self.is_trainable:

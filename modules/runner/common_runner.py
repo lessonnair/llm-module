@@ -12,7 +12,7 @@ class Export(Task):
         self.max_shard_size = self.get_config("max_shard_size")
 
     def main_handle(self):
-        model = self.get_instance("model")
+        model = self.get_instance("model", is_trainable=False)
         tokenizer = self.get_instance("TokenizerLoader")
 
         model.config.use_cache = True
@@ -44,10 +44,15 @@ class Chat(Task):
 
     def _get_model(self):
         if self.model_path is not None and len(self.model_path) > 0:
-            model = self.new_instance("model", model_path=self.model_path)
+            model_task = self.new_instance_task("model",
+                                                model_path=self.model_path
+                                                )
+            model_task.finetune_args.checkpoint_dir = [self.model_path]
+            model_task.main_handle()
+            model = model_task.inst
+
         else:
             model = self.get_instance("model")
-
 
         model.eval()
         model.requires_grad_(False)
@@ -114,17 +119,3 @@ class Chat(Task):
                 response += new_text
 
             history = history + [(query, response)]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
