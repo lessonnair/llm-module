@@ -29,6 +29,7 @@ class Render(object):
         else:
             # for baichuan, qwen and gpt2 models
             bos_ids = []
+
         if tokenizer.eos_token_id is None:
             raise ValueError("EOS token is required.")
 

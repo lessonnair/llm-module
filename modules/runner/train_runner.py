@@ -101,9 +101,11 @@ class Trainer(Task):
     def init_model(self):
         model_loader = ModelLoader(self.config)
         model_loader.set_trainable(True)
+        model_loader.set_finetune_args(self.finetune_args)
         model_loader.main_handle()
 
         model = model_loader.inst
+
 
         if self.stage in ("rm", "ppo"):
             from trl import AutoModelForCausalLMWithValueHead

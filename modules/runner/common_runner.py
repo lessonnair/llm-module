@@ -47,6 +47,8 @@ class Chat(Task):
             model = self.new_instance("model", model_path=self.model_path)
         else:
             model = self.get_instance("model")
+
+
         model.eval()
         model.requires_grad_(False)
 

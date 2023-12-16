@@ -38,9 +38,6 @@ class TokenizerLoader(Task):
             **self.params
         )
 
-        if getattr(tokenizer, "eos_token", None) is None:
-            tokenizer.eos_token = tokenizer.cls_token
-
         if getattr(tokenizer, "pad_token", None) is None:
             tokenizer.pad_token = tokenizer.eos_token
 
@@ -66,11 +63,9 @@ class ModelLoader(Task):
         else:
             self.model_path = model_path
         self.print_model_structure = self.get_config("print_model_structure")
-        
-        self.finetune_arguments = self.get_instance("finetune_arguments")
 
         params = self.get_section_params()
-        for c in ("pretrained_model_name_or_path", "print_model_structure", "finetune_arguments"):
+        for c in ("pretrained_model_name_or_path", "print_model_structure"):
             if c in params:
                 params.pop(c)
 
@@ -89,6 +84,8 @@ class ModelLoader(Task):
         self.quantization_type = self.pop_dict(params, "quantization_type", None)
         self.checkpoint_dir = self.pop_dict(params, "checkpoint_dir")
 
+        self.use_gradient_checkpointing = self.pop_dict(params, "use_gradient_checkpointing", True)
+
         self.config_kwargs = config_kwargs
         self.params = params
 
@@ -96,12 +93,17 @@ class ModelLoader(Task):
             self.config_kwargs["proxies"] = self.proxies
 
         self.is_trainable = False
+        self.finetune_args = None
 
     def set_model_path(self, model_path):
         self.model_path = model_path
 
     def set_trainable(self, is_trainable):
         self.is_trainable = is_trainable
+
+
+    def set_finetune_args(self, finetune_args):
+        self.finetune_args = finetune_args
 
     def main_handle(self):
 
@@ -218,10 +220,11 @@ class ModelLoader(Task):
 
         if self.is_trainable:
             model = prepare_model_for_train(model=model,
-                                            finetuning_args=self.finetune_arguments)
-        if self.finetune_arguments is not None:
+                                            finetuning_args=self.finetune_args,
+                                            use_gradient_checkpointing=self.use_gradient_checkpointing)
+        if self.finetune_args is not None:
             model = init_adapter(model,
-                                 self.finetune_arguments,
+                                 self.finetune_args,
                                  self.is_trainable,
                                  is_mergeable,
                                  quantization_bit=self.quantization_bit,

@@ -82,7 +82,7 @@ def init_adapter(
         logger.info("Fine-tuning method: Full")
         model = model.float()
 
-    if finetuning_args.type == "freeze":
+    elif finetuning_args.type == "freeze":
         logger.info("Fine-tuning method: Freeze")
         num_layers = getattr(model.config, "num_layers")
         if finetuning_args.num_layer_trainable > 0:  # fine-tuning the last n layers if num_layer_trainable > 0
@@ -97,7 +97,7 @@ def init_adapter(
             else:
                 param.data = param.data.to(torch.float32)
 
-    if finetuning_args.type == "lora":
+    elif finetuning_args.type == "lora":
         logger.info("Fine-tuning method: LoRA")
         latest_checkpoint = None
 
