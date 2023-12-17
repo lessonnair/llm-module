@@ -106,7 +106,7 @@ class Chat(Task):
 
             if query.strip() == "clear":
                 history = []
-                self.logger("History has been removed.")
+                self.logger.info("History has been removed.")
                 continue
 
             print("Assistant: ", end="", flush=True)
