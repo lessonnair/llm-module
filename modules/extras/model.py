@@ -32,7 +32,7 @@ def prepare_model_for_train(
             if param.ndim == 1 and any(ln_name in name for ln_name in layernorm_names):
                 param.data = param.data.to(torch.float32)
 
-    if finetuning_args is not None and finetuning_args.neft_alpha > 1e-6:
+    if finetuning_args is not None and finetuning_args.neft_alpha is not None and finetuning_args.neft_alpha > 1e-6:
         input_embed: torch.nn.Embedding = model.get_input_embeddings()
 
         def noisy_forward(self: torch.nn.Embedding, x: torch.Tensor) -> torch.Tensor:
