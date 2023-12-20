@@ -5,13 +5,10 @@ from types import MethodType
 from typing import TYPE_CHECKING, List, Optional
 from peft import (
     PeftModel,
-    TaskType,
-    LoraConfig,
     get_peft_model
 )
 from modules.util.constants import LAYERNORM_NAMES
 from modules.util.custom_log import get_logger
-from modules.util.model_util import find_all_linear_modules
 
 logger = get_logger(__name__)
 

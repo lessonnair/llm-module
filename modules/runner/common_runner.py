@@ -31,6 +31,8 @@ class Chat(Task):
     def __init__(self, config, name=None):
         super(Chat, self).__init__(config, name=name)
 
+        self.clear_cache()
+
         self.generating_args = self.get_instance("generating_args")
 
         render = self.get_config("render")
@@ -44,13 +46,10 @@ class Chat(Task):
 
     def _get_model(self):
         if self.model_path is not None and len(self.model_path) > 0:
-            model_task = self.new_instance_task("model",
-                                                model_path=self.model_path
-                                                )
+            model_task = self.new_instance_task("model", model_path=self.model_path)
             model_task.finetune_args.checkpoint_dir = [self.model_path]
             model_task.main_handle()
             model = model_task.inst
-
         else:
             model = self.get_instance("model")
 

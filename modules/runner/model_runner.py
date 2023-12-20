@@ -3,12 +3,12 @@
 from .basic_runner import Task
 import math
 from transformers import AutoConfig, AutoTokenizer, PretrainedConfig
-from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase, PreTrainedModel
+from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase
 from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version
 from modules.util.model_util import *
 from modules.util.util import *
-from modules.extras.model import *
+from modules.core.model.util import *
 
 try:
     from transformers.integrations import is_deepspeed_zero3_enabled
@@ -157,7 +157,7 @@ class ModelLoader(Task):
                 self.logger.warning("Current model does not support RoPE scaling.")
 
         if self.flash_attn:
-            from modules.extras import llama_patch
+            from ..core.model import llama_patch
             if getattr(config, "model_type", None) == "llama":
                 LlamaModule.LlamaAttention = llama_patch.LlamaFlashAttention2
                 LlamaModule.LlamaModel._prepare_decoder_attention_mask = llama_patch._prepare_decoder_attention_mask
@@ -167,7 +167,7 @@ class ModelLoader(Task):
             else:
                 self.logger.warning("Current model does not support FlashAttention-2.")
         elif self.is_trainable and self.shift_attn and getattr(config, "model_type", None) == "llama":
-            from modules.extras import llama_patch
+            from ..core.model import llama_patch
             LlamaModule.LlamaAttention = llama_patch.LlamaShiftShortAttention
             self.logger.warning("Using `--flash_attn` for faster training in large context length.")
 

@@ -79,6 +79,9 @@ class Task(object):
 
         return task_inst.inst
 
+    def clear_cache(self):
+        self.instance_pool.clear()
+
 
     def new_instance_task(self, key, **kwargs):
         key = self.get_config(key)
