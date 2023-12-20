@@ -2,7 +2,7 @@
 
 from .basic_runner import Task
 import math
-from transformers import AutoConfig, AutoTokenizer, PretrainedConfig
+from transformers import AutoConfig, AutoTokenizer, PretrainedConfig, PreTrainedModel
 from transformers import BitsAndBytesConfig, PreTrainedTokenizerBase
 from transformers.models.llama import modeling_llama as LlamaModule
 from transformers.utils.versions import require_version

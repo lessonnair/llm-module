@@ -2,7 +2,7 @@
 
 from .basic_runner import Task
 from datasets import load_dataset
-from modules.core.etl.process import DataProcessor
+from modules.core.data.process import DataProcessor
 
 
 class DatasetLoader(Task):
