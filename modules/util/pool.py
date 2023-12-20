@@ -32,8 +32,7 @@ class InstancePool(object):
 
     def clear(self):
         lock.acquire()
-        for obj in self.pool.pop():
-            del obj
+        self.pool.clear()
         lock.release()
         torch.cuda.empty_cache()
 
