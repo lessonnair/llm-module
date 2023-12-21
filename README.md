@@ -19,83 +19,71 @@ pip install -r requirements.txt
 
 2. Write a configuration file
 
+In the file, you can define multiple components. 
+
 ```config
 [Project]
 name=myLLM
 version=1.0
 user=test
 proxies={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"}
-pipeline=Trainer
+pipeline=Trainer,Export,Chat
 
 [TokenizerLoader]
-;You can configure all the parameters that appear in the methods `transformers.AutoConfig.from_pretrained`
+# You can configure all the parameters that appear in the methods `transformers.AutoConfig.from_pretrained`
 and `transformers.AutoTokenizer.from_pretrained`.
-pretrained_model_name_or_path=uer/gpt2-chinese-cluecorpussmall
+pretrained_model_name_or_path=THUDM/chatglm2-6b
 use_fast=True
-split_special_tokens=True
+;split_special_tokens=True
 ;padding_side=right
 device_map=auto
 trust_remote_code=True
 
 [ModelLoader]
-;You can specify additional parameters for the class below, for example, `transformers.AutoModelForCausalLM`
-class=transformers.AutoModelForCausalLM
-pretrained_model_name_or_path=uer/gpt2-chinese-cluecorpussmall
+# You can specify additional parameters for the class below, for example, `transformers.AutoModelForCausalLM`
+class=transformers.AutoModel
+pretrained_model_name_or_path=THUDM/chatglm2-6b
 print_model_structure=False
 trust_remote_code=True
 cache_dir=./cache
-revision=
 device_map=auto
 use_auth_token=False
-#torch_dtype=bf16
+;torch_dtype=bf16
+use_gradient_checkpointing=False
 
 # for LLama and Falcon models
-
-#rope_scaling=dynamic
+;rope_scaling=dynamic
 model_max_length=2000
-
 flash_attn=False
 shift_attn=False
-#quantization_bit=8
-#double_quantization=4
+;quantization_bit=8
+;double_quantization=4
 quantization_type=
+finetune_args=FinetuneArguments
 
 [FinetuneArguments]
-
-# type should be full,freeze or lora
-
+# type can be full,freeze or lora
 type=lora
-
-# stage can be pt,sft,ppo,dpo or rm
-
-stage=sft
 checkpoint_dir=
-upcast_layernorm=True
-neft_alpha=1e-6
-
-# when stage is ppo, you need to set reward_model
-
-reward_model=../output_rm
 
 # you can set parameters available in the peft.LoraConfig method, make sure to prefix the parameter names with lora_config, for example, `lora_config_target_modules` instead of `target_modules`.
-
 lora_config_task_type=CAUSAL_LM
 lora_config_inference_mode=False
-lora_config_r=16
+lora_config_r=4
 lora_config_lora_alpha=32
 lora_config_lora_dropout=0.05
-lora_config_target_modules=c_fc
-
+lora_config_target_modules=query_key_value
 # bias can be set none or all or lora_only
+;lora_config_bias=none
+;lora_config_fan_in_fan_out=True
 
-lora_config_bias=none
-lora_config_fan_in_fan_out=True
+;num_layer_trainable=2
+;upcast_layernorm=True
+;neft_alpha=1e-6
 
 [TrainingArguments]
-
 # You can specify additional parameters for the class below, for example, `transformers.Seq2SeqTrainingArguments`
-
-#class=transformers.TrainingArguments
+; class=transformers.TrainingArguments
 class=transformers.Seq2SeqTrainingArguments
 generation_max_length=256
 generation_num_beams=1
@@ -103,32 +91,31 @@ per_device_train_batch_size=1
 per_device_eval_batch_size=1
 gradient_accumulation_steps=2
 warmup_steps=20
-max_steps=500
-num_train_epochs=1
-learning_rate=2e-4
-#fp16=True
+max_steps=800
+;num_train_epochs=1
+learning_rate=1e-5
+;fp16=True
 logging_steps=25
 do_train=True
 remove_unused_columns=False
-output_dir=../output_ppo
+output_dir=./output_train
 save_safetensors=False
 seed=2023
 
 [GenerateArguments]
-
 # you can set parameters available in the transformers.GenerationConfig method
-
 do_sample=True
-temperature=0.95
-#top_p=1.0
-#top_k=50
+temperature=1.0
+;top_p=1.0
+;top_k=50
 num_beams=1
-max_length=128
-max_new_tokens=128
+max_length=2048
+;max_new_tokens=128
 repetition_penalty=1.0
-length_penalty=2.0
+length_penalty=1.0
 
 [Trainer]
+class=transformers.Seq2SeqTrainer
 model=ModelLoader
 tokenizer=TokenizerLoader
 args=TrainingArguments
@@ -145,14 +132,16 @@ steps=train,eval,predict
 predict_with_generate=True
 ppo_args=PPOArguments
 generate_args=GenerateArguments
-finetune_args=FinetuneArguments
+
+# stage can be pt,sft,ppo,dpo or rm
+stage=sft
+# when stage is ppo, you need to set reward_model
+reward_model=./output_reward_model
 
 [DatasetLoader_1]
-
 # type should be hf_hub or script or file
-
 path=json
-data_files=../data/oaast_sft_zh.json
+data_files=./data/oaast_sft_zh.json
 text_column=instruction
 prompt_column=instruction
 query_column=input
@@ -160,36 +149,51 @@ history_column=history
 response_column=output
 system_column=system
 split=train
-cache_dir=../cache
+cache_dir=./cache
 streaming=False
 use_auth_token=False
 
 # etl process params
-
 tokenizer=TokenizerLoader
-
 # stage can be pt or sft or rm or ppo
-
 cutoff_len=128
 sft_packing=True
-render=vanilla
+render=chatglm2
 label_mask_prompt=True
 
 [Export]
 tokenizer=TokenizerLoader
 model=ModelLoader
-output_dir=./export
-max_shard_size=5
+output_dir=./export/chatglm2_lora
+max_shard_size=5gb
 
 [Chat]
 tokenizer=TokenizerLoader
 model=ModelLoader
-pretrained_model_name_or_path=./export
+pretrained_model_name_or_path=./export/chatglm2_lora
 generating_args=GenerateArguments
-render=vanilla
+render=chatglm2
 ```
 
-3. Run `sh run.sh`
+3. Run `sh run.sh example.conf`
+- example.conf is the task configuration file defined above
+
+## Supported Component
+
+### Basic Component
+
+- Trainer
+- DatasetLoader
+- TokenizerLoader
+- ModelLoader
+- Export
+- Chat
+
+### Param Component
+
+- TrainingArguments
+- GenerateArguments
+- FinetuneArguments
 
 ## Supported Models
 
