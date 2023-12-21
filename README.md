@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 2. Write a configuration file
 
-<code>
+```config
 [Project]
 name=myLLM
 version=1.0
@@ -187,7 +187,7 @@ model=ModelLoader
 pretrained_model_name_or_path=./export
 generating_args=GenerateArguments
 render=vanilla
-</code>
+```
 
 3. Run `sh run.sh`
 
