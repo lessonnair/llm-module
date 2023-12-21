@@ -17,9 +17,9 @@ A tool with multiple modular components for the training and evaluation of LLM
 pip install -r requirements.txt
 ```
 
-3. Write a configuration file
+2. Write a configuration file
 
-```config
+<code>
 [Project]
 name=myLLM
 version=1.0
@@ -28,7 +28,8 @@ proxies={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"}
 pipeline=Trainer
 
 [TokenizerLoader]
-;You can configure all the parameters that appear in the methods `transformers.AutoConfig.from_pretrained` and `transformers.AutoTokenizer.from_pretrained`.
+;You can configure all the parameters that appear in the methods `transformers.AutoConfig.from_pretrained`
+and `transformers.AutoTokenizer.from_pretrained`.
 pretrained_model_name_or_path=uer/gpt2-chinese-cluecorpussmall
 use_fast=True
 split_special_tokens=True
@@ -49,6 +50,7 @@ use_auth_token=False
 #torch_dtype=bf16
 
 # for LLama and Falcon models
+
 #rope_scaling=dynamic
 model_max_length=2000
 
@@ -59,31 +61,40 @@ shift_attn=False
 quantization_type=
 
 [FinetuneArguments]
+
 # type should be full,freeze or lora
+
 type=lora
+
 # stage can be pt,sft,ppo,dpo or rm
+
 stage=sft
 checkpoint_dir=
 upcast_layernorm=True
 neft_alpha=1e-6
 
 # when stage is ppo, you need to set reward_model
+
 reward_model=../output_rm
 
 # you can set parameters available in the peft.LoraConfig method, make sure to prefix the parameter names with lora_config, for example, `lora_config_target_modules` instead of `target_modules`.
+
 lora_config_task_type=CAUSAL_LM
 lora_config_inference_mode=False
 lora_config_r=16
 lora_config_lora_alpha=32
 lora_config_lora_dropout=0.05
 lora_config_target_modules=c_fc
+
 # bias can be set none or all or lora_only
+
 lora_config_bias=none
 lora_config_fan_in_fan_out=True
 
-
 [TrainingArguments]
+
 # You can specify additional parameters for the class below, for example, `transformers.Seq2SeqTrainingArguments`
+
 #class=transformers.TrainingArguments
 class=transformers.Seq2SeqTrainingArguments
 generation_max_length=256
@@ -104,7 +115,9 @@ save_safetensors=False
 seed=2023
 
 [GenerateArguments]
+
 # you can set parameters available in the transformers.GenerationConfig method
+
 do_sample=True
 temperature=0.95
 #top_p=1.0
@@ -135,7 +148,9 @@ generate_args=GenerateArguments
 finetune_args=FinetuneArguments
 
 [DatasetLoader_1]
+
 # type should be hf_hub or script or file
+
 path=json
 data_files=../data/oaast_sft_zh.json
 text_column=instruction
@@ -150,8 +165,11 @@ streaming=False
 use_auth_token=False
 
 # etl process params
+
 tokenizer=TokenizerLoader
+
 # stage can be pt or sft or rm or ppo
+
 cutoff_len=128
 sft_packing=True
 render=vanilla
@@ -169,11 +187,9 @@ model=ModelLoader
 pretrained_model_name_or_path=./export
 generating_args=GenerateArguments
 render=vanilla
-```
+</code>
 
-4. Run `sh run.sh`
-
-### run
+3. Run `sh run.sh`
 
 ## Supported Models
 
