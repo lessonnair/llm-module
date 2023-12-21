@@ -56,7 +56,7 @@ class Task(object):
         if inst is not None:
             return inst
         else:
-            if re.match("^\\w+_[0-9]+$", key):
+            if re.match("^\\w+_[a-zA-Z0-9]+$", key):
                 class_name = key.split("_")[0]
                 task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
             else:
@@ -70,7 +70,7 @@ class Task(object):
         if key is None or len(key) <= 0:
             return None
 
-        if re.match("^\\w+_[0-9]+$", key):
+        if re.match("^\\w+_[a-zA-Z0-9]+$", key):
             class_name = key.split("_")[0]
             task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
         else:
@@ -82,13 +82,12 @@ class Task(object):
     def clear_cache(self):
         self.instance_pool.clear()
 
-
     def new_instance_task(self, key, **kwargs):
         key = self.get_config(key)
         if key is None or len(key) <= 0:
             return None
 
-        if re.match("^\\w+_[0-9]+$", key):
+        if re.match("^\\w+_[a-zA-Z0-9]+$", key):
             class_name = key.split("_")[0]
             task_inst = getattr(sys.modules["modules.runner"], class_name)(self.config, key, **kwargs)
         else:
