@@ -9,3 +9,4 @@ if [ -z "$1" ]; then
 else
   config_file=$1
   python modules/main.py $config_file
+fi
