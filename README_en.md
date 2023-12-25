@@ -222,5 +222,6 @@ render=chatglm2
 | PPO Training           |                    |                    | :white_check_mark: | :white_check_mark: |
 | DPO Training           | :white_check_mark: |                    | :white_check_mark: | :white_check_mark: |
 
+## References
 
-
+- [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
