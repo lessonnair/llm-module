@@ -4,6 +4,7 @@ from .basic_runner import Task
 from modules.core.render.base_render import Render
 from modules.core.chat.stream_chat import ChatModel
 
+
 class Export(Task):
     def __init__(self, config, name=None):
         super(Export, self).__init__(config, name=name)
@@ -43,7 +44,6 @@ class Chat(Task):
         self.tokenizer = self._get_tokenizer()
         self.model = self._get_model()
 
-
     def _get_model(self):
         if self.model_path is not None and len(self.model_path) > 0:
             model_task = self.new_instance_task("model", model_path=self.model_path)
@@ -57,7 +57,6 @@ class Chat(Task):
         model.requires_grad_(False)
 
         return model
-
 
     def _get_tokenizer(self):
         # if self.model_path is not None and len(self.model_path) > 0:

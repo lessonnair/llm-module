@@ -1,9 +1,7 @@
 import os
 import torch
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional
-
 from transformers.trainer import WEIGHTS_NAME
-
 from modules.util.custom_log import get_logger
 
 if TYPE_CHECKING:
@@ -11,6 +9,7 @@ if TYPE_CHECKING:
     from trl import AutoModelForCausalLMWithValueHead
 
 logger = get_logger(__name__)
+
 
 def find_all_linear_modules(model: "PreTrainedModel",
                             quantization_bit: Optional[int] = None,

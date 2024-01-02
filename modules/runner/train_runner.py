@@ -40,9 +40,7 @@ class Trainer(Task):
         self.predict_with_generate = self.get_config("predict_with_generate", False)
 
         self.args.predict_with_generate = self.predict_with_generate
-
         self.data_collator = self.init_data_collator()
-
         self.model = self.init_model()
 
     def split_dataset(self, dataset):
@@ -126,7 +124,6 @@ class Trainer(Task):
         ))
 
         return model
-
 
     def main_handle(self):
 

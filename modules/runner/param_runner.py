@@ -52,7 +52,6 @@ class TrainingArguments(Task):
         )
 
 
-
 class GenerateArguments(Task):
     def __init__(self, config, name=None):
         super(GenerateArguments, self).__init__(config, name=name)
